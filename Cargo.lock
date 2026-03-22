@@ -310,17 +310,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "mnn"
+name = "mnn-rs"
 version = "0.1.0"
 dependencies = [
- "mnn-sys",
+ "mnn-rs-sys",
  "tempfile",
  "thiserror",
  "tokio",
 ]
 
 [[package]]
-name = "mnn-sys"
+name = "mnn-rs-sys"
 version = "0.1.0"
 dependencies = [
  "bindgen",

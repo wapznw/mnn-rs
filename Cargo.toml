@@ -22,7 +22,7 @@ cmake = "0.1"
 pkg-config = "0.3"
 
 [package]
-name = "mnn"
+name = "mnn-rs"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -34,49 +34,49 @@ keywords.workspace = true
 categories.workspace = true
 rust-version.workspace = true
 authors.workspace = true
-documentation = "https://docs.rs/mnn"
+documentation = "https://docs.rs/mnn-rs"
 
 [features]
 default = ["cpu", "static"]
 
 # Linking method
-static = ["mnn-sys/static"]
-dynamic = ["mnn-sys/dynamic"]
+static = ["mnn-rs-sys/static"]
+dynamic = ["mnn-rs-sys/dynamic"]
 
 # Backend support
-cpu = ["mnn-sys/cpu"]
-cuda = ["mnn-sys/cuda"]
-opencl = ["mnn-sys/opencl"]
-vulkan = ["mnn-sys/vulkan"]
-metal = ["mnn-sys/metal"]
+cpu = ["mnn-rs-sys/cpu"]
+cuda = ["mnn-rs-sys/cuda"]
+opencl = ["mnn-rs-sys/opencl"]
+vulkan = ["mnn-rs-sys/vulkan"]
+metal = ["mnn-rs-sys/metal"]
 
 # Precision support
-fp16 = ["mnn-sys/fp16"]
+fp16 = ["mnn-rs-sys/fp16"]
 bf16 = []
-int8 = ["mnn-sys/int8"]
+int8 = ["mnn-rs-sys/int8"]
 
 # Quantization
-quantization = ["mnn-sys/quantization"]
+quantization = ["mnn-rs-sys/quantization"]
 
 # x86 SIMD optimizations
-sse = ["mnn-sys/sse"]
-avx2 = ["mnn-sys/avx2"]
-avx512 = ["mnn-sys/avx512"]
+sse = ["mnn-rs-sys/sse"]
+avx2 = ["mnn-rs-sys/avx2"]
+avx512 = ["mnn-rs-sys/avx512"]
 
 # Async support
 async = ["dep:tokio"]
 
 # Build options
-build-from-source = ["mnn-sys/build-from-source"]
-system-mnn = ["mnn-sys/system-mnn"]
+build-from-source = ["mnn-rs-sys/build-from-source"]
+system-mnn = ["mnn-rs-sys/system-mnn"]
 
 # Platform specific (usually auto-detected)
-android = ["mnn-sys/android"]
-ios = ["mnn-sys/ios"]
+android = ["mnn-rs-sys/android"]
+ios = ["mnn-rs-sys/ios"]
 embedded = []
 
 [dependencies]
-mnn-sys = { path = "mnn-sys", version = "0.1.0" }
+mnn-rs-sys = { path = "mnn-sys", version = "0.1.0", package = "mnn-rs-sys" }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true, features = ["rt", "sync"] }
 

@@ -8,7 +8,7 @@
 //! cargo run --example gpu_backend --features cuda -- /path/to/model.mnn
 //! ```
 
-use mnn::{prelude::*, BackendType, MemoryMode, PrecisionMode, ScheduleConfig};
+use mnn_rs::{prelude::*, BackendType, MemoryMode, PrecisionMode, ScheduleConfig};
 
 fn main() -> Result<(), MnnError> {
     // Get model path from command line

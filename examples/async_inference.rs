@@ -8,7 +8,7 @@
 //! ```
 
 #[cfg(feature = "async")]
-use mnn::{prelude::*, AsyncInterpreter, ScheduleConfig};
+use mnn_rs::{prelude::*, AsyncInterpreter, ScheduleConfig};
 
 #[cfg(feature = "async")]
 #[tokio::main]

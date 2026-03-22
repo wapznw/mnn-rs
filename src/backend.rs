@@ -34,16 +34,16 @@ impl BackendType {
     /// Convert to MNN forward type constant.
     pub(crate) fn to_mnn_type(&self) -> i32 {
         match self {
-            BackendType::CPU => mnn_sys::MNN_FORWARD_CPU,
+            BackendType::CPU => mnn_rs_sys::MNN_FORWARD_CPU,
             #[cfg(feature = "cuda")]
-            BackendType::Cuda => mnn_sys::MNN_FORWARD_CUDA,
+            BackendType::Cuda => mnn_rs_sys::MNN_FORWARD_CUDA,
             #[cfg(feature = "opencl")]
-            BackendType::OpenCL => mnn_sys::MNN_FORWARD_OPENCL,
+            BackendType::OpenCL => mnn_rs_sys::MNN_FORWARD_OPENCL,
             #[cfg(feature = "vulkan")]
-            BackendType::Vulkan => mnn_sys::MNN_FORWARD_VULKAN,
+            BackendType::Vulkan => mnn_rs_sys::MNN_FORWARD_VULKAN,
             #[cfg(feature = "metal")]
-            BackendType::Metal => mnn_sys::MNN_FORWARD_METAL,
-            BackendType::Auto => mnn_sys::MNN_FORWARD_AUTO,
+            BackendType::Metal => mnn_rs_sys::MNN_FORWARD_METAL,
+            BackendType::Auto => mnn_rs_sys::MNN_FORWARD_AUTO,
         }
     }
 
@@ -80,7 +80,7 @@ impl BackendType {
 
     /// Check if this backend is available on the current system.
     pub fn is_available(&self) -> bool {
-        unsafe { mnn_sys::mnn_is_backend_available(self.to_mnn_type()) != 0 }
+        unsafe { mnn_rs_sys::mnn_is_backend_available(self.to_mnn_type()) != 0 }
     }
 
     /// Get all available backends on this system.
@@ -345,7 +345,7 @@ impl std::fmt::Display for DataType {
 /// Get the MNN version string.
 pub fn version() -> String {
     unsafe {
-        let ptr = mnn_sys::mnn_get_version();
+        let ptr = mnn_rs_sys::mnn_get_version();
         if ptr.is_null() {
             return String::from("unknown");
         }

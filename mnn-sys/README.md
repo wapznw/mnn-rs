@@ -1,11 +1,11 @@
-# mnn-sys
+# mnn-rs-sys
 
-[![Crates.io](https://img.shields.io/crates/v/mnn-sys.svg)](https://crates.io/crates/mnn-sys)
-[![Documentation](https://docs.rs/mnn-sys/badge.svg)](https://docs.rs/mnn-sys)
+[![Crates.io](https://img.shields.io/crates/v/mnn-rs-sys.svg)](https://crates.io/crates/mnn-rs-sys)
+[![Documentation](https://docs.rs/mnn-rs-sys/badge.svg)](https://docs.rs/mnn-rs-sys)
 
 Raw FFI bindings for [MNN](https://github.com/alibaba/MNN) (Mobile Neural Network) inference engine.
 
-This crate provides low-level unsafe bindings to MNN's C API. For a safe, idiomatic Rust API, see the [`mnn`](https://crates.io/crates/mnn) crate.
+This crate provides low-level unsafe bindings to MNN's C API. For a safe, idiomatic Rust API, see the [`mnn-rs`](https://crates.io/crates/mnn-rs) crate.
 
 ## Features
 
@@ -22,7 +22,7 @@ This crate provides low-level unsafe bindings to MNN's C API. For a safe, idioma
 ```toml
 # Cargo.toml
 [dependencies]
-mnn-sys = { version = "0.1", features = ["build-from-source"] }
+mnn-rs-sys = { version = "0.1", features = ["build-from-source"] }
 ```
 
 The build script will automatically clone and compile MNN from GitHub.

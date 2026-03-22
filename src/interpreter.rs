@@ -6,7 +6,7 @@
 use crate::config::ScheduleConfig;
 use crate::error::{MnnError, MnnResult};
 use crate::session::Session;
-use mnn_sys::MNNInterpreter;
+use mnn_rs_sys::MNNInterpreter;
 use std::ffi::CString;
 use std::path::Path;
 
@@ -21,7 +21,7 @@ use std::path::Path;
 ///
 /// # Example
 /// ```no_run
-/// use mnn::{Interpreter, ScheduleConfig, BackendType};
+/// use mnn_rs::{Interpreter, ScheduleConfig, BackendType};
 ///
 /// // Load a model
 /// let interpreter = Interpreter::from_file("model.mnn")?;
@@ -42,7 +42,7 @@ use std::path::Path;
 ///
 /// // Get output
 /// let output = session.get_output(None)?;
-/// # Ok::<(), mnn::MnnError>(())
+/// # Ok::<(), mnn_rs::MnnError>(())
 /// ```
 pub struct Interpreter {
     inner: *mut MNNInterpreter,
@@ -65,10 +65,10 @@ impl Interpreter {
     ///
     /// # Example
     /// ```no_run
-    /// use mnn::Interpreter;
+    /// use mnn_rs::Interpreter;
     ///
     /// let interpreter = Interpreter::from_file("model.mnn")?;
-    /// # Ok::<(), mnn::MnnError>(())
+    /// # Ok::<(), mnn_rs::MnnError>(())
     /// ```
     pub fn from_file<P: AsRef<Path>>(path: P) -> MnnResult<Self> {
         let path_str = path.as_ref().to_string_lossy().into_owned();
@@ -80,7 +80,7 @@ impl Interpreter {
 
         let c_path = CString::new(path_str.as_str())?;
 
-        let inner = unsafe { mnn_sys::mnn_interpreter_create_from_file(c_path.as_ptr()) };
+        let inner = unsafe { mnn_rs_sys::mnn_interpreter_create_from_file(c_path.as_ptr()) };
 
         if inner.is_null() {
             return Err(MnnError::invalid_model(format!(
@@ -107,12 +107,12 @@ impl Interpreter {
     /// A new interpreter on success, or an error if the model cannot be loaded.
     ///
     /// # Example
-    /// ```no_run
-    /// use mnn::Interpreter;
+    /// ```ignore
+    /// use mnn_rs::Interpreter;
     ///
     /// let model_data = include_bytes!("model.mnn");
     /// let interpreter = Interpreter::from_bytes(model_data)?;
-    /// # Ok::<(), mnn::MnnError>(())
+    /// # Ok::<(), mnn_rs::MnnError>(())
     /// ```
     pub fn from_bytes(data: &[u8]) -> MnnResult<Self> {
         if data.is_empty() {
@@ -120,7 +120,7 @@ impl Interpreter {
         }
 
         let inner = unsafe {
-            mnn_sys::mnn_interpreter_create_from_buffer(
+            mnn_rs_sys::mnn_interpreter_create_from_buffer(
                 data.as_ptr() as *const std::ffi::c_void,
                 data.len(),
             )
@@ -161,7 +161,7 @@ impl Interpreter {
     /// The business code string.
     pub fn business_code(&self) -> String {
         unsafe {
-            let ptr = mnn_sys::mnn_interpreter_get_biz_code(self.inner);
+            let ptr = mnn_rs_sys::mnn_interpreter_get_biz_code(self.inner);
             if ptr.is_null() {
                 return String::new();
             }
@@ -177,7 +177,7 @@ impl Interpreter {
     /// The UUID string.
     pub fn uuid(&self) -> String {
         unsafe {
-            let ptr = mnn_sys::mnn_interpreter_get_uuid(self.inner);
+            let ptr = mnn_rs_sys::mnn_interpreter_get_uuid(self.inner);
             if ptr.is_null() {
                 return String::new();
             }
@@ -192,7 +192,7 @@ impl Drop for Interpreter {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             unsafe {
-                mnn_sys::mnn_interpreter_destroy(self.inner);
+                mnn_rs_sys::mnn_interpreter_destroy(self.inner);
             }
         }
     }

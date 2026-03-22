@@ -6,7 +6,7 @@
 use crate::backend::DataType;
 use crate::config::DataFormat;
 use crate::error::{MnnError, MnnResult};
-use mnn_sys::MNNTensor;
+use mnn_rs_sys::MNNTensor;
 use std::ffi::c_void;
 use std::marker::PhantomData;
 
@@ -64,14 +64,14 @@ impl Tensor {
     /// Get the shape of the tensor.
     pub fn shape(&self) -> Vec<i32> {
         unsafe {
-            let dim_count = mnn_sys::mnn_tensor_get_dimensions(self.inner);
+            let dim_count = mnn_rs_sys::mnn_tensor_get_dimensions(self.inner);
             if dim_count <= 0 {
                 return Vec::new();
             }
 
             let mut shape = Vec::with_capacity(dim_count as usize);
             for i in 0..dim_count {
-                let dim = mnn_sys::mnn_tensor_get_dim(self.inner, i);
+                let dim = mnn_rs_sys::mnn_tensor_get_dim(self.inner, i);
                 shape.push(dim);
             }
             shape
@@ -80,7 +80,7 @@ impl Tensor {
 
     /// Get the number of dimensions.
     pub fn ndim(&self) -> usize {
-        unsafe { mnn_sys::mnn_tensor_get_dimensions(self.inner) as usize }
+        unsafe { mnn_rs_sys::mnn_tensor_get_dimensions(self.inner) as usize }
     }
 
     /// Get the size of a specific dimension.
@@ -106,7 +106,7 @@ impl Tensor {
     /// Get the data format of the tensor.
     pub fn format(&self) -> DataFormat {
         unsafe {
-            let dim_type = mnn_sys::mnn_tensor_get_dimension_type(self.inner);
+            let dim_type = mnn_rs_sys::mnn_tensor_get_dimension_type(self.inner);
             match dim_type {
                 0 => DataFormat::Nhwc,
                 1 => DataFormat::Nc4hw4,
@@ -118,12 +118,12 @@ impl Tensor {
 
     /// Get the total number of elements in the tensor.
     pub fn element_count(&self) -> i32 {
-        unsafe { mnn_sys::mnn_tensor_get_element_count(self.inner) }
+        unsafe { mnn_rs_sys::mnn_tensor_get_element_count(self.inner) }
     }
 
     /// Get the size of the tensor data in bytes.
     pub fn byte_size(&self) -> usize {
-        unsafe { mnn_sys::mnn_tensor_get_size(self.inner) as usize }
+        unsafe { mnn_rs_sys::mnn_tensor_get_size(self.inner) as usize }
     }
 
     /// Get the name of the tensor.
@@ -151,7 +151,7 @@ impl Tensor {
             ));
         }
 
-        let host_data = unsafe { mnn_sys::mnn_tensor_get_host_data(self.inner) };
+        let host_data = unsafe { mnn_rs_sys::mnn_tensor_get_host_data(self.inner) };
         if host_data.is_null() {
             return Err(MnnError::tensor_error("Tensor has no host data"));
         }
@@ -175,7 +175,7 @@ impl Tensor {
         let count = self.element_count() as usize;
         let mut data = vec![T::default(); count];
 
-        let host_data = unsafe { mnn_sys::mnn_tensor_get_host_data(self.inner) };
+        let host_data = unsafe { mnn_rs_sys::mnn_tensor_get_host_data(self.inner) };
         if host_data.is_null() {
             return Err(MnnError::tensor_error("Tensor has no host data"));
         }
@@ -198,7 +198,7 @@ impl Tensor {
     /// are performed on the tensor.
     pub unsafe fn as_slice_mut<T: TensorData>(&mut self) -> MnnResult<&mut [T]> {
         let count = self.element_count() as usize;
-        let ptr = unsafe { mnn_sys::mnn_tensor_get_host_data(self.inner) };
+        let ptr = unsafe { mnn_rs_sys::mnn_tensor_get_host_data(self.inner) };
 
         if ptr.is_null() {
             return Err(MnnError::tensor_error("Tensor has no host data"));
@@ -214,7 +214,7 @@ impl Tensor {
     /// are performed on the tensor.
     pub unsafe fn as_slice<T: TensorData>(&self) -> MnnResult<&[T]> {
         let count = self.element_count() as usize;
-        let ptr = unsafe { mnn_sys::mnn_tensor_get_host_data(self.inner) };
+        let ptr = unsafe { mnn_rs_sys::mnn_tensor_get_host_data(self.inner) };
 
         if ptr.is_null() {
             return Err(MnnError::tensor_error("Tensor has no host data"));
@@ -323,14 +323,14 @@ impl<'a> TensorView<'a> {
     /// Get the shape of the tensor.
     pub fn shape(&self) -> Vec<i32> {
         unsafe {
-            let dim_count = mnn_sys::mnn_tensor_get_dimensions(self.inner);
+            let dim_count = mnn_rs_sys::mnn_tensor_get_dimensions(self.inner);
             if dim_count <= 0 {
                 return Vec::new();
             }
 
             let mut shape = Vec::with_capacity(dim_count as usize);
             for i in 0..dim_count {
-                let dim = mnn_sys::mnn_tensor_get_dim(self.inner, i);
+                let dim = mnn_rs_sys::mnn_tensor_get_dim(self.inner, i);
                 shape.push(dim);
             }
             shape

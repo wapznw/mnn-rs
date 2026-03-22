@@ -123,16 +123,19 @@ fn main() {
     let wrapper_dir = PathBuf::from("wrapper");
     let wrapper_cpp = wrapper_dir.join("mnn_wrapper.cpp");
 
-    // Get include directory for MNN headers
-    let mnn_include = include_dir.clone().unwrap_or_else(|| PathBuf::new());
-
     // Build the wrapper library
     let mut build = cc::Build::new();
     build
         .cpp(true)
         .file(&wrapper_cpp)
-        .include(&wrapper_dir)
-        .include(&mnn_include);
+        .include(&wrapper_dir);
+
+    // Add MNN include directory if available
+    if let Some(ref inc_dir) = include_dir {
+        if !inc_dir.as_os_str().is_empty() {
+            build.include(inc_dir);
+        }
+    }
 
     // Set C++ standard and compiler flags based on TARGET (not host)
     if target_env == "msvc" {

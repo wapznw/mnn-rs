@@ -1,8 +1,8 @@
 # mnn-rs
 
-[![Crates.io](https://img.shields.io/crates/v/mnn.svg)](https://crates.io/crates/mnn)
-[![Documentation](https://docs.rs/mnn/badge.svg)](https://docs.rs/mnn)
-[![License](https://img.shields.io/crates/l/mnn.svg)](https://github.com/yourusername/mnn-rs#license)
+[![Crates.io](https://img.shields.io/crates/v/mnn-rs.svg)](https://crates.io/crates/mnn-rs)
+[![Documentation](https://docs.rs/mnn-rs/badge.svg)](https://docs.rs/mnn-rs)
+[![License](https://img.shields.io/crates/l/mnn-rs.svg)](https://github.com/wapznw/mnn-rs#license)
 
 Rust bindings for [MNN](https://github.com/alibaba/MNN) (Mobile Neural Network), Alibaba's efficient and lightweight deep learning inference framework.
 
@@ -33,7 +33,7 @@ cargo build
 ```toml
 # Cargo.toml
 [dependencies]
-mnn = { version = "0.1", features = ["build-from-source"] }
+mnn-rs = { version = "0.1", features = ["build-from-source"] }
 ```
 
 ```bash
@@ -46,7 +46,7 @@ cargo build --features build-from-source
 ### Basic Inference
 
 ```rust
-use mnn::{prelude::*, BackendType, ScheduleConfig};
+use mnn_rs::{prelude::*, BackendType, ScheduleConfig};
 
 fn main() -> Result<(), MnnError> {
     // Load model
@@ -78,7 +78,7 @@ fn main() -> Result<(), MnnError> {
 ### Async Inference (with Tokio)
 
 ```rust
-use mnn::{prelude::*, BackendType, ScheduleConfig};
+use mnn_rs::{prelude::*, BackendType, ScheduleConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), MnnError> {
@@ -196,7 +196,7 @@ cargo build --target aarch64-linux-android --features build-from-source
 
 ## API Documentation
 
-See [https://docs.rs/mnn](https://docs.rs/mnn) for full API documentation.
+See [https://docs.rs/mnn-rs](https://docs.rs/mnn-rs) for full API documentation.
 
 ## MNN Version
 

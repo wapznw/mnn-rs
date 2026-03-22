@@ -13,7 +13,7 @@
 //! cargo run --example basic_inference -- /path/to/model.mnn
 //! ```
 
-use mnn::{prelude::*, BackendType, ScheduleConfig};
+use mnn_rs::{prelude::*, BackendType, ScheduleConfig};
 
 fn main() -> Result<(), MnnError> {
     // Get model path from command line

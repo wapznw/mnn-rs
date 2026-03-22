@@ -6,7 +6,7 @@
 use crate::config::ScheduleConfig;
 use crate::error::{MnnError, MnnResult};
 use crate::tensor::Tensor;
-use mnn_sys::MNNSession;
+use mnn_rs_sys::MNNSession;
 use std::ffi::CString;
 
 /// An inference session.
@@ -20,7 +20,7 @@ use std::ffi::CString;
 pub struct Session {
     inner: *mut MNNSession,
     /// Interpreter pointer (not owned)
-    interpreter: *mut mnn_sys::MNNInterpreter,
+    interpreter: *mut mnn_rs_sys::MNNInterpreter,
     /// Whether the session has been run at least once
     has_run: bool,
 }
@@ -35,12 +35,12 @@ impl Session {
     /// # Safety
     /// The interpreter pointer must be valid.
     pub(crate) unsafe fn new(
-        interpreter: *mut mnn_sys::MNNInterpreter,
+        interpreter: *mut mnn_rs_sys::MNNInterpreter,
         config: ScheduleConfig,
     ) -> MnnResult<Self> {
         // SAFETY: Caller ensures interpreter pointer is valid
         let inner = unsafe {
-            mnn_sys::mnn_interpreter_create_session(
+            mnn_rs_sys::mnn_interpreter_create_session(
                 interpreter,
                 config.backend_config.backend_type.to_mnn_type(),
                 config.num_threads as i32,
@@ -76,7 +76,7 @@ impl Session {
             };
 
             let tensor_ptr =
-                mnn_sys::mnn_interpreter_get_session_input(self.interpreter, self.inner, name_ptr);
+                mnn_rs_sys::mnn_interpreter_get_session_input(self.interpreter, self.inner, name_ptr);
 
             if tensor_ptr.is_null() {
                 return Err(MnnError::tensor_error(match name {
@@ -109,7 +109,7 @@ impl Session {
                 None => std::ptr::null(),
             };
 
-            let tensor_ptr = mnn_sys::mnn_interpreter_get_session_output(
+            let tensor_ptr = mnn_rs_sys::mnn_interpreter_get_session_output(
                 self.interpreter,
                 self.inner,
                 name_ptr,
@@ -138,20 +138,20 @@ impl Session {
     /// Ok(()) on success, or an error on failure.
     pub fn run(&mut self) -> MnnResult<()> {
         let result =
-            unsafe { mnn_sys::mnn_interpreter_run_session(self.interpreter, self.inner) };
+            unsafe { mnn_rs_sys::mnn_interpreter_run_session(self.interpreter, self.inner) };
 
         match result {
-            x if x == mnn_sys::MNN_ERROR_NONE => {
+            x if x == mnn_rs_sys::MNN_ERROR_NONE => {
                 self.has_run = true;
                 Ok(())
             }
-            x if x == mnn_sys::MNN_ERROR_OUT_OF_MEMORY => {
+            x if x == mnn_rs_sys::MNN_ERROR_OUT_OF_MEMORY => {
                 Err(MnnError::out_of_memory("Out of memory during inference"))
             }
-            x if x == mnn_sys::MNN_ERROR_NOT_SUPPORT => {
+            x if x == mnn_rs_sys::MNN_ERROR_NOT_SUPPORT => {
                 Err(MnnError::unsupported("Operation not supported"))
             }
-            x if x == mnn_sys::MNN_ERROR_EXECUTION => {
+            x if x == mnn_rs_sys::MNN_ERROR_EXECUTION => {
                 Err(MnnError::internal("Execution error during inference"))
             }
             code => Err(MnnError::internal(format!(
@@ -169,14 +169,14 @@ impl Session {
     /// Get the memory usage of this session in bytes.
     pub fn memory_usage(&self) -> usize {
         let memory_mb = unsafe {
-            mnn_sys::mnn_interpreter_get_session_memory(self.interpreter, self.inner)
+            mnn_rs_sys::mnn_interpreter_get_session_memory(self.interpreter, self.inner)
         };
         (memory_mb * 1024.0 * 1024.0) as usize
     }
 
     /// Get the FLOPS count of this session.
     pub fn flops(&self) -> f32 {
-        unsafe { mnn_sys::mnn_interpreter_get_session_flops(self.interpreter, self.inner) }
+        unsafe { mnn_rs_sys::mnn_interpreter_get_session_flops(self.interpreter, self.inner) }
     }
 }
 
@@ -184,7 +184,7 @@ impl Drop for Session {
     fn drop(&mut self) {
         if !self.inner.is_null() && !self.interpreter.is_null() {
             unsafe {
-                mnn_sys::mnn_interpreter_release_session(self.interpreter, self.inner);
+                mnn_rs_sys::mnn_interpreter_release_session(self.interpreter, self.inner);
             }
         }
     }
@@ -240,23 +240,23 @@ mod async_impl {
             let interpreter = self.interpreter;
 
             let result = tokio::task::spawn_blocking(move || unsafe {
-                mnn_sys::mnn_interpreter_run_session(interpreter, inner)
+                mnn_rs_sys::mnn_interpreter_run_session(interpreter, inner)
             })
             .await
             .map_err(|e| MnnError::AsyncError(e.to_string()))?;
 
             match result {
-                x if x == mnn_sys::MNN_ERROR_NONE => {
+                x if x == mnn_rs_sys::MNN_ERROR_NONE => {
                     self.has_run = true;
                     Ok(())
                 }
-                x if x == mnn_sys::MNN_ERROR_OUT_OF_MEMORY => {
+                x if x == mnn_rs_sys::MNN_ERROR_OUT_OF_MEMORY => {
                     Err(MnnError::out_of_memory("Out of memory during inference"))
                 }
-                x if x == mnn_sys::MNN_ERROR_NOT_SUPPORT => {
+                x if x == mnn_rs_sys::MNN_ERROR_NOT_SUPPORT => {
                     Err(MnnError::unsupported("Operation not supported"))
                 }
-                x if x == mnn_sys::MNN_ERROR_EXECUTION => {
+                x if x == mnn_rs_sys::MNN_ERROR_EXECUTION => {
                     Err(MnnError::internal("Execution error during inference"))
                 }
                 code => Err(MnnError::internal(format!(

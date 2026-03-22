@@ -3,7 +3,7 @@
 //! These tests require a valid MNN model file to run.
 //! Tests are skipped if no model is available.
 
-use mnn::prelude::*;
+use mnn_rs::prelude::*;
 
 /// Check if a test model is available
 fn test_model_available() -> Option<&'static str> {
@@ -19,14 +19,14 @@ fn test_model_available() -> Option<&'static str> {
 
 #[test]
 fn test_version() {
-    let v = mnn::version();
+    let v = mnn_rs::version();
     // Version should be a string (may be "unknown" if MNN not linked)
     assert!(!v.is_empty());
 }
 
 #[test]
 fn test_available_backends() {
-    let backends = mnn::available_backends();
+    let backends = mnn_rs::available_backends();
     // CPU should always be available (even if not linked properly)
     // At minimum, this tests that the function doesn't crash
     println!("Available backends: {:?}", backends);
@@ -119,17 +119,17 @@ fn test_error_types() {
 
     let err = MnnError::shape_mismatch(&[1, 2, 3], &[1, 2, 4]);
     assert!(err.to_string().contains("expected"));
-    assert!(err.to_string().contains("actual"));
+    assert!(err.to_string().contains("got"));
 }
 
 #[test]
 fn test_utility_functions() {
     let shape = [1, 3, 224, 224];
 
-    let size = mnn::calculate_tensor_size(&shape, 4);
+    let size = mnn_rs::calculate_tensor_size(&shape, 4);
     assert_eq!(size, 1 * 3 * 224 * 224 * 4);
 
-    let count = mnn::calculate_element_count(&shape);
+    let count = mnn_rs::calculate_element_count(&shape);
     assert_eq!(count, 1 * 3 * 224 * 224);
 }
 
@@ -178,7 +178,7 @@ mod async_tests {
     #[tokio::test]
     async fn test_async_interpreter_creation() {
         if let Some(model_path) = test_model_available() {
-            let result = mnn::AsyncInterpreter::from_file(model_path).await;
+            let result = mnn_rs::AsyncInterpreter::from_file(model_path).await;
             assert!(result.is_ok());
         }
     }

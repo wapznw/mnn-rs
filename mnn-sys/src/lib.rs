@@ -1,7 +1,7 @@
 //! Raw FFI bindings for MNN (Mobile Neural Network) inference engine.
 //!
 //! This crate provides unsafe raw bindings to the MNN C wrapper API.
-//! Users should prefer the safe `mnn` crate instead.
+//! Users should prefer the safe `mnn-rs` crate instead.
 //!
 //! # Safety
 //!

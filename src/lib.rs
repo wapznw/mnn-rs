@@ -15,7 +15,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use mnn::{Interpreter, ScheduleConfig, BackendType};
+//! use mnn_rs::{Interpreter, ScheduleConfig, BackendType};
 //!
 //! // Load a model
 //! let interpreter = Interpreter::from_file("model.mnn")?;
@@ -39,13 +39,13 @@
 //! // Get output
 //! let output = session.get_output(None)?;
 //!
-//! # Ok::<(), mnn::MnnError>(())
+//! # Ok::<(), mnn_rs::MnnError>(())
 //! ```
 //!
 //! ## Backend Configuration
 //!
 //! ```no_run
-//! use mnn::{ScheduleConfig, BackendType, MemoryMode, PrecisionMode};
+//! use mnn_rs::{ScheduleConfig, BackendType, MemoryMode, PrecisionMode};
 //!
 //! // CPU with custom settings
 //! let cpu_config = ScheduleConfig::new()
@@ -58,16 +58,16 @@
 //!     .backend(BackendType::Auto)
 //!     .precision_mode(PrecisionMode::Low);
 //!
-//! # Ok::<(), mnn::MnnError>(())
+//! # Ok::<(), mnn_rs::MnnError>(())
 //! ```
 //!
 //! ## Async API (requires "async" feature)
 //!
 //! ```ignore
-//! use mnn::{AsyncInterpreter, ScheduleConfig};
+//! use mnn_rs::{AsyncInterpreter, ScheduleConfig};
 //!
 //! #[tokio::main]
-//! async fn main() -> Result<(), mnn::MnnError> {
+//! async fn main() -> Result<(), mnn_rs::MnnError> {
 //!     let interpreter = AsyncInterpreter::from_file("model.mnn").await?;
 //!     let mut session = interpreter.create_session(ScheduleConfig::default()).await?;
 //!
@@ -81,7 +81,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 #![warn(missing_debug_implementations)]
 
-pub use mnn_sys;
+pub use mnn_rs_sys;
 
 // Core modules
 mod error;
@@ -126,7 +126,7 @@ pub mod prelude {
     //! This module re-exports the most commonly used types for convenience.
     //!
     //! ```
-    //! use mnn::prelude::*;
+    //! use mnn_rs::prelude::*;
     //! ```
 
     pub use crate::backend::{BackendType, DataType};
