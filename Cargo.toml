@@ -10,9 +10,9 @@ repository = "https://github.com/wapznw/mnn-rs"
 homepage = "https://github.com/wapznw/mnn-rs"
 description = "Rust bindings for Alibaba MNN (Mobile Neural Network) inference engine"
 keywords = ["mnn", "neural-network", "inference", "deep-learning", "machine-learning"]
-categories = ["api-bindings", "science", "science::ml"]
+categories = ["api-bindings", "algorithms", "science"]
 rust-version = "1.70"
-authors = ["DJ.W wapznw@gmail.com>"]
+authors = ["DJ.W <wapznw@gmail.com>"]
 
 [workspace.dependencies]
 thiserror = "1.0"
