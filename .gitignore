@@ -1,0 +1,75 @@
+# Build artifacts
+target/
+.claude/
+build_test/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock file for library
+# Cargo.lock
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Test and coverage
+/coverage/
+*.profraw
+*.profdata
+tarpaulin-report.html
+
+# Documentation
+/doc/
+
+# Build directories
+/build/
+/dist/
+/out/
+
+# Model files (for testing)
+*.mnn
+*.onnx
+*.tflite
+*.pb
+*.h5
+*.pth
+*.pt
+!tests/models/*.mnn
+
+# Claude Code memory (keep in repo but ignore changes)
+# .claude/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Python (if using Python tools)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/

@@ -1,0 +1,82 @@
+[workspace]
+resolver = "2"
+members = ["mnn-sys"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/your-org/mnn-rs"
+description = "Rust bindings for Alibaba MNN (Mobile Neural Network) inference engine"
+keywords = ["mnn", "neural-network", "inference", "deep-learning", "machine-learning"]
+categories = ["api-bindings", "science", "science::ml"]
+
+[workspace.dependencies]
+thiserror = "1.0"
+tokio = { version = "1.0", default-features = false }
+bindgen = "0.69"
+cmake = "0.1"
+pkg-config = "0.3"
+
+[package]
+name = "mnn"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Safe Rust bindings for Alibaba MNN (Mobile Neural Network) inference engine"
+readme = "README.md"
+
+[features]
+default = ["cpu", "static"]
+
+# Linking method
+static = ["mnn-sys/static"]
+dynamic = ["mnn-sys/dynamic"]
+
+# Backend support
+cpu = ["mnn-sys/cpu"]
+cuda = ["mnn-sys/cuda"]
+opencl = ["mnn-sys/opencl"]
+vulkan = ["mnn-sys/vulkan"]
+metal = ["mnn-sys/metal"]
+
+# Precision support
+fp16 = ["mnn-sys/fp16"]
+bf16 = []
+int8 = ["mnn-sys/int8"]
+
+# Quantization
+quantization = ["mnn-sys/quantization"]
+
+# Async support
+async = ["dep:tokio"]
+
+# Build options
+build-from-source = ["mnn-sys/build-from-source"]
+system-mnn = ["mnn-sys/system-mnn"]
+
+# Platform specific (usually auto-detected)
+android = ["mnn-sys/android"]
+ios = ["mnn-sys/ios"]
+embedded = []
+
+[dependencies]
+mnn-sys = { path = "mnn-sys", version = "0.1.0" }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true, features = ["rt", "sync"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] }
+tempfile = "3.0"
+
+[[example]]
+name = "basic_inference"
+required-features = ["cpu"]
+
+[[example]]
+name = "async_inference"
+required-features = ["async"]
+
+[[example]]
+name = "gpu_backend"
+required-features = ["cuda"]
