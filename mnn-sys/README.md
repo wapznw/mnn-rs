@@ -17,22 +17,27 @@ This crate provides low-level unsafe bindings to MNN's C API. For a safe, idioma
 
 ## Usage
 
-### Building from Source (Recommended)
+### Default Build (Recommended)
 
-```toml
-# Cargo.toml
-[dependencies]
-mnn-rs-sys = { version = "0.1", features = ["build-from-source"] }
+By default, the crate will automatically clone and build MNN from GitHub:
+
+```bash
+cargo build
 ```
 
-The build script will automatically clone and compile MNN from GitHub.
+This requires Git, CMake, and a C++ compiler.
 
 ### Using Pre-built MNN
 
+If you have a pre-built MNN library:
+
 ```bash
+# Set environment variables
 export MNN_LIB_DIR=/path/to/mnn/lib
 export MNN_INCLUDE_DIR=/path/to/mnn/include
-cargo build
+
+# Build without auto-build
+cargo build --no-default-features --features cpu,static
 ```
 
 ## Features

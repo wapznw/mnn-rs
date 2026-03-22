@@ -37,7 +37,7 @@ authors.workspace = true
 documentation = "https://docs.rs/mnn-rs"
 
 [features]
-default = ["cpu", "static"]
+default = ["cpu", "static", "build-from-source"]
 
 # Linking method
 static = ["mnn-rs-sys/static"]

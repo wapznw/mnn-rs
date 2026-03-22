@@ -14,7 +14,7 @@ authors.workspace = true
 links = "mnn"
 
 [features]
-default = ["cpu", "static"]
+default = ["cpu", "static", "build-from-source"]
 
 # Linking method
 static = []

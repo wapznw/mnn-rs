@@ -17,28 +17,30 @@ Rust bindings for [MNN](https://github.com/alibaba/MNN) (Mobile Neural Network),
 
 ## Quick Start
 
+### Default Build (Recommended)
+
+By default, the crate will automatically clone and build MNN from GitHub:
+
+```bash
+cargo build
+```
+
+This requires:
+- Git (for cloning MNN source)
+- CMake (for building MNN)
+- C++ compiler (MSVC on Windows, GCC/Clang on Linux/macOS)
+
 ### Using Pre-built MNN
+
+If you have a pre-built MNN library, you can disable the auto-build:
 
 ```bash
 # Set MNN library paths
 export MNN_LIB_DIR=/path/to/mnn/lib
 export MNN_INCLUDE_DIR=/path/to/mnn/include
 
-# Build
-cargo build
-```
-
-### Building MNN from Source (Recommended)
-
-```toml
-# Cargo.toml
-[dependencies]
-mnn-rs = { version = "0.1", features = ["build-from-source"] }
-```
-
-```bash
-# The build script will automatically clone and compile MNN
-cargo build --features build-from-source
+# Build without build-from-source feature
+cargo build --no-default-features --features cpu,static
 ```
 
 ## Usage

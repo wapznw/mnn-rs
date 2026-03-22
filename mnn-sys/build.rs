@@ -123,6 +123,26 @@ fn main() {
     let wrapper_dir = PathBuf::from("wrapper");
     let wrapper_cpp = wrapper_dir.join("mnn_wrapper.cpp");
 
+    // Check if we have MNN headers available
+    if include_dir.is_none() && !build_from_source {
+        panic!(
+            "MNN headers not found!\n\
+            \n\
+            Please do one of the following:\n\
+            1. Enable 'build-from-source' feature to auto-build MNN:\n\
+               cargo build --features build-from-source\n\
+            \n\
+            2. Set MNN_INCLUDE_DIR and MNN_LIB_DIR environment variables:\n\
+               set MNN_INCLUDE_DIR=/path/to/mnn/include\n\
+               set MNN_LIB_DIR=/path/to/mnn/lib\n\
+               cargo build\n\
+            \n\
+            3. Set MNN_SOURCE_PATH to use existing MNN source:\n\
+               set MNN_SOURCE_PATH=/path/to/mnn/source\n\
+               cargo build --features build-from-source"
+        );
+    }
+
     // Build the wrapper library
     let mut build = cc::Build::new();
     build
