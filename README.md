@@ -162,27 +162,85 @@ cargo run --features build-from-source --example basic_inference -- /path/to/mod
 
 ## Cross-Compilation
 
-### Windows (x86_64-pc-windows-gnu)
-
-```bash
-# Install MinGW-w64 toolchain
-rustup target add x86_64-pc-windows-gnu
-cargo build --target x86_64-pc-windows-gnu --features build-from-source
-```
-
-### Windows (i686-pc-windows-gnu)
-
-```bash
-rustup target add i686-pc-windows-gnu
-cargo build --target i686-pc-windows-gnu --features build-from-source
-```
-
 ### Android
 
 ```bash
+# Install Android target
 rustup target add aarch64-linux-android
-export ANDROID_NDK_HOME=/path/to/ndk
-cargo build --target aarch64-linux-android --features build-from-source
+
+# Set Android NDK path (required)
+export ANDROID_NDK_HOME=/path/to/android-ndk
+
+# Build for Android (requires Ninja)
+cargo build --target aarch64-linux-android
+```
+
+**Android Requirements:**
+- Android NDK (set `ANDROID_NDK_HOME` or `NDK_HOME` environment variable)
+- Ninja build system (`choco install ninja` on Windows, `brew install ninja` on macOS)
+
+**Supported Android targets:**
+- `aarch64-linux-android` (arm64-v8a)
+- `armv7-linux-androideabi` (armeabi-v7a)
+- `x86_64-linux-android`
+- `i686-linux-android`
+
+### iOS
+
+```bash
+# Install iOS target
+rustup target add aarch64-apple-ios
+rustup target add aarch64-apple-ios-sim
+
+# Build for iOS device
+cargo build --target aarch64-apple-ios
+
+# Build for iOS simulator (Apple Silicon Macs)
+cargo build --target aarch64-apple-ios-sim
+
+# Build for iOS simulator (Intel Macs)
+cargo build --target x86_64-apple-ios
+```
+
+**iOS Requirements:**
+- Xcode with iOS SDK
+- Ninja build system (recommended: `brew install ninja`)
+
+**Supported iOS targets:**
+- `aarch64-apple-ios` (iOS device)
+- `aarch64-apple-ios-sim` (iOS simulator on Apple Silicon)
+- `x86_64-apple-ios` (iOS simulator on Intel Macs)
+
+### Linux
+
+```bash
+# Standard build
+cargo build --target x86_64-unknown-linux-gnu
+
+# Cross-compile for ARM
+rustup target add aarch64-unknown-linux-gnu
+cargo build --target aarch64-unknown-linux-gnu
+```
+
+### macOS
+
+```bash
+# Intel Macs
+cargo build --target x86_64-apple-darwin
+
+# Apple Silicon Macs
+cargo build --target aarch64-apple-darwin
+```
+
+### Windows
+
+```bash
+# MSVC (recommended)
+cargo build --target x86_64-pc-windows-msvc
+
+# MinGW
+rustup target add x86_64-pc-windows-gnu
+cargo build --target x86_64-pc-windows-gnu
 ```
 
 ## Environment Variables

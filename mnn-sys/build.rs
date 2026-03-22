@@ -38,6 +38,29 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
 
+/// Get the NDK host tag based on the current host platform
+fn get_ndk_host_tag() -> &'static str {
+    // Check HOST environment variable first (set by Cargo)
+    if let Ok(host) = env::var("HOST") {
+        if host.contains("windows") {
+            return "windows-x86_64";
+        } else if host.contains("apple-darwin") {
+            return "darwin-x86_64";
+        } else if host.contains("linux") {
+            return "linux-x86_64";
+        }
+    }
+
+    // Fallback to checking the OS
+    if cfg!(target_os = "windows") {
+        "windows-x86_64"
+    } else if cfg!(target_os = "macos") {
+        "darwin-x86_64"
+    } else {
+        "linux-x86_64"
+    }
+}
+
 fn main() {
     // Check if we should print debug info
     let debug_build = env::var("MNN_DEBUG_BUILD").is_ok();
@@ -157,6 +180,77 @@ fn main() {
         }
     }
 
+    // Configure Android NDK compiler for cross-compilation
+    if target_os == "android" {
+        let ndk_home = env::var("ANDROID_NDK_HOME")
+            .or_else(|_| env::var("NDK_HOME"))
+            .expect("ANDROID_NDK_HOME or NDK_HOME must be set for Android builds");
+
+        let ndk_path = std::path::Path::new(&ndk_home);
+
+        // Determine toolchain path and prefix based on target
+        let tool_prefix = match &target_arch[..] {
+            "aarch64" => "aarch64-linux-android",
+            "armv7" | "arm" => "arm-linux-androideabi",
+            "x86_64" => "x86_64-linux-android",
+            "x86" => "i686-linux-android",
+            _ => panic!("Unsupported Android architecture: {}", target_arch),
+        };
+
+        // Find NDK toolchain directory
+        let host_tag = get_ndk_host_tag();
+        let toolchain_bin = ndk_path
+            .join("toolchains")
+            .join("llvm")
+            .join("prebuilt")
+            .join(host_tag)
+            .join("bin");
+
+        if !toolchain_bin.exists() {
+            panic!(
+                "Android NDK toolchain not found.\n\
+                Expected at: {:?}\n\
+                Make sure ANDROID_NDK_HOME is set correctly and NDK is installed.",
+                toolchain_bin
+            );
+        }
+
+        // Try different compiler names
+        // 1. With API version suffix (e.g., aarch64-linux-android21-clang++)
+        // 2. Without version suffix (e.g., aarch64-linux-android-clang++)
+        // 3. Generic clang++ with --target flag
+        let compilers_to_try = [
+            toolchain_bin.join(format!("{}21-clang++.exe", tool_prefix)),
+            toolchain_bin.join(format!("{}-clang++.exe", tool_prefix)),
+            toolchain_bin.join("clang++.exe"),
+        ];
+
+        let mut found_compiler = None;
+        for compiler_path in &compilers_to_try {
+            if compiler_path.exists() {
+                found_compiler = Some(compiler_path.clone());
+                if debug_build {
+                    println!("cargo:warning=mnn-sys: Found Android C++ compiler: {:?}", compiler_path);
+                }
+                break;
+            }
+        }
+
+        if let Some(compiler) = found_compiler {
+            build.compiler(&compiler);
+            // If using generic clang++, add target flag
+            if compiler.file_name().unwrap() == "clang++.exe" {
+                build.flag(format!("--target={}", target));
+            }
+        } else {
+            panic!(
+                "Could not find Android C++ compiler in NDK.\n\
+                Tried: {:?}",
+                compilers_to_try
+            );
+        }
+    }
+
     // Set C++ standard and compiler flags based on TARGET (not host)
     if target_env == "msvc" {
         build.flag("/std:c++14");
@@ -222,6 +316,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=MNN_USE_SYSTEM");
     println!("cargo:rerun-if-env-changed=CUDA_PATH");
     println!("cargo:rerun-if-env-changed=ANDROID_NDK_HOME");
+    println!("cargo:rerun-if-env-changed=NDK_HOME");
 
     // Re-run if wrapper changes
     println!("cargo:rerun-if-changed=wrapper/mnn_wrapper.h");
@@ -234,14 +329,21 @@ fn main() {
 
 /// Parse target OS from target triple
 fn get_target_os(target: &str) -> String {
+    // Check for Android first (e.g., aarch64-linux-android)
+    // Android targets have "android" in the triple, but also contain "linux"
+    if target.contains("android") {
+        return "android".to_string();
+    }
+    if target.contains("ios") {
+        return "ios".to_string();
+    }
+
     let parts: Vec<&str> = target.split('-').collect();
     for part in &parts {
         match *part {
             "windows" => return "windows".to_string(),
             "linux" => return "linux".to_string(),
             "macos" | "darwin" => return "macos".to_string(),
-            "android" => return "android".to_string(),
-            "ios" => return "ios".to_string(),
             _ => {}
         }
     }
@@ -422,9 +524,30 @@ fn build_mnn_from_source(
     std::fs::write(&config_file, config_hash.to_string()).expect("Failed to write config file");
 
     // Determine generator and architecture based on target
-    let (generator, extra_args) = if target_os == "windows" {
+    let (generator, extra_args) = if target_os == "android" {
+        // Android requires Ninja build system
+        let ninja_available = Command::new("ninja").arg("--version").output().is_ok();
+        if !ninja_available {
+            panic!(
+                "Ninja build system is required for Android builds.\n\
+                Install it with:\n\
+                - Windows: choco install ninja\n\
+                - macOS: brew install ninja\n\
+                - Linux: apt install ninja-build"
+            );
+        }
+        (Some("Ninja"), vec![])
+    } else if target_os == "ios" {
+        // iOS requires Ninja or Xcode
+        let ninja_available = Command::new("ninja").arg("--version").output().is_ok();
+        if ninja_available {
+            (Some("Ninja"), vec![])
+        } else {
+            (Some("Xcode"), vec![])
+        }
+    } else if target_os == "windows" {
         if target_env == "msvc" {
-            let arch = match target_arch {
+            let arch = match &target_arch[..] {
                 "x86_64" => "x64",
                 "x86" => "Win32",
                 "aarch64" => "ARM64",
@@ -435,9 +558,17 @@ fn build_mnn_from_source(
             (Some("MinGW Makefiles"), vec![])
         }
     } else if target_os == "linux" {
+        // Linux defaults to Unix Makefiles or Ninja
         (None, vec![])
     } else if target_os == "macos" {
-        (Some("Xcode"), vec![])
+        // macOS: prefer Ninja for consistency, fallback to default
+        let ninja_available = Command::new("ninja").arg("--version").output().is_ok();
+        if ninja_available {
+            (Some("Ninja"), vec![])
+        } else {
+            // Let CMake choose (usually Unix Makefiles on macOS)
+            (None, vec![])
+        }
     } else {
         (None, vec![])
     };
@@ -517,21 +648,97 @@ fn build_mnn_from_source(
         }
     }
 
+    // Android NDK cross-compilation support
+    if target_os == "android" {
+        let ndk_home = env::var("ANDROID_NDK_HOME")
+            .or_else(|_| env::var("NDK_HOME"))
+            .expect("ANDROID_NDK_HOME or NDK_HOME must be set for Android builds");
+
+        let ndk_path = std::path::Path::new(&ndk_home);
+
+        // Determine Android ABI and platform
+        let (abi, platform, _toolchain_name) = match &target_arch[..] {
+            "aarch64" => ("arm64-v8a", "android-24", "aarch64-linux-android"),
+            "armv7" | "arm" => ("armeabi-v7a", "android-24", "arm-linux-androideabi"),
+            "x86_64" => ("x86_64", "android-24", "x86_64-linux-android"),
+            "x86" => ("x86", "android-24", "i686-linux-android"),
+            _ => panic!("Unsupported Android architecture: {}", target_arch),
+        };
+
+        // Use NDK toolchain file
+        let toolchain_file = ndk_path.join("build/cmake/android.toolchain.cmake");
+        if !toolchain_file.exists() {
+            panic!("Android NDK toolchain file not found at {:?}", toolchain_file);
+        }
+
+        cmake_args.push(format!("-DCMAKE_TOOLCHAIN_FILE={}", toolchain_file.display()));
+        cmake_args.push(format!("-DANDROID_ABI={}", abi));
+        cmake_args.push(format!("-DANDROID_PLATFORM={}", platform));
+        cmake_args.push("-DANDROID_STL=c++_static".to_string());
+        cmake_args.push("-DCMAKE_SYSTEM_NAME=Android".to_string());
+
+        if debug {
+            println!("cargo:warning=mnn-sys: Android NDK: {:?}", ndk_path);
+            println!("cargo:warning=mnn-sys: Android ABI: {}", abi);
+            println!("cargo:warning=mnn-sys: Android Platform: {}", platform);
+        }
+
+        // Disable KleidiAI on Android as it has linking issues with stdout/stderr
+        cmake_args.push("-DMNN_KLEIDIAI=OFF".to_string());
+    }
+
+    // iOS cross-compilation support
+    if target_os == "ios" {
+        // Determine iOS platform and architecture
+        let (platform, arch, sdk_name) = match target {
+            t if t.starts_with("aarch64-apple-ios") => ("OS64", "arm64", "iphoneos"),
+            t if t.starts_with("aarch64-apple-ios-sim") => ("SIMULATORARM64", "arm64", "iphonesimulator"),
+            t if t.starts_with("x86_64-apple-ios") => ("SIMULATOR64", "x86_64", "iphonesimulator"),
+            t if t.starts_with("i386-apple-ios") || t.starts_with("i686-apple-ios") => ("SIMULATOR", "i386", "iphonesimulator"),
+            t if t.starts_with("armv7-apple-ios") => ("OS", "armv7", "iphoneos"),
+            t if t.starts_with("armv7s-apple-ios") => ("OS", "armv7s", "iphoneos"),
+            _ => panic!("Unsupported iOS target: {}", target),
+        };
+
+        // Set CMake system name
+        cmake_args.push("-DCMAKE_SYSTEM_NAME=iOS".to_string());
+        cmake_args.push(format!("-DCMAKE_OSX_ARCHITECTURES={}", arch));
+        cmake_args.push(format!("-DPLATFORM={}", platform));
+
+        // Enable Metal backend by default for iOS
+        if !cfg!(feature = "metal") {
+            cmake_args.push("-DMNN_METAL=ON".to_string());
+        }
+
+        if debug {
+            println!("cargo:warning=mnn-sys: iOS Platform: {}", platform);
+            println!("cargo:warning=mnn-sys: iOS Arch: {}", arch);
+            println!("cargo:warning=mnn-sys: iOS SDK: {}", sdk_name);
+        }
+    }
+
     if debug {
         println!("cargo:warning=mnn-sys: CMake args: {:?}", cmake_args);
+        println!("cargo:warning=mnn-sys: Generator: {:?}", generator);
     }
 
     // Run CMake configure
     let mut cmd = Command::new("cmake");
-    cmd.args(&cmake_args);
 
+    // Pass generator BEFORE other args (important for Android/Ninja)
     if let Some(gen) = generator {
         cmd.args(["-G", gen]);
     }
+
+    cmd.args(&cmake_args);
     cmd.args(&extra_args);
 
     cmd.args(["-B", build_dir.to_str().unwrap()]);
     cmd.args(["-S", source_path.to_str().unwrap()]);
+
+    if debug {
+        println!("cargo:warning=mnn-sys: CMake configure command: {:?}", cmd);
+    }
 
     let status = cmd.status().expect("Failed to run CMake configure. Make sure cmake is installed.");
 
@@ -545,11 +752,11 @@ fn build_mnn_from_source(
         .and_then(|s| s.parse().ok())
         .unwrap_or_else(num_cpus::get);
 
+    // First, build the library
     let mut build_cmd = Command::new("cmake");
     build_cmd
         .args(["--build", build_dir.to_str().unwrap()])
-        .args(["--config", "Release"])
-        .args(["--target", "install"]);
+        .args(["--config", "Release"]);
 
     if target_os == "windows" && target_env == "msvc" {
         build_cmd.args(["--", "/m", &format!("/p:CL_MPCount={}", num_jobs)]);
@@ -569,8 +776,73 @@ fn build_mnn_from_source(
         panic!("CMake build failed");
     }
 
-    let lib_dir = install_dir.join("lib");
-    let include_dir = install_dir.join("include");
+    // Then, install the library
+    let mut install_cmd = Command::new("cmake");
+    install_cmd
+        .args(["--install", build_dir.to_str().unwrap()])
+        .args(["--config", "Release"]);
+
+    if debug {
+        println!("cargo:warning=mnn-sys: Install command: {:?}", install_cmd);
+    }
+
+    let install_status = install_cmd
+        .status()
+        .expect("Failed to run CMake install");
+
+    if !install_status.success() {
+        // cmake --install might fail on some platforms, try manual installation
+        if debug {
+            println!("cargo:warning=mnn-sys: cmake --install failed, trying manual installation");
+        }
+    }
+
+    // Check if install directory was created
+    let installed_lib = install_dir.join("lib").join(if target_os == "windows" {
+        if target_env == "gnu" { "libMNN.a" } else { "mnn.lib" }
+    } else {
+        "libmnn.a"
+    });
+
+    let (lib_dir, include_dir) = if installed_lib.exists() {
+        // cmake --install worked
+        (install_dir.join("lib"), install_dir.join("include"))
+    } else {
+        // Manual fallback: use build directory and source include
+        if debug {
+            println!("cargo:warning=mnn-sys: Using fallback paths for lib and include");
+        }
+
+        // Create install directories
+        std::fs::create_dir_all(install_dir.join("lib")).ok();
+        std::fs::create_dir_all(install_dir.join("include")).ok();
+
+        // Copy library if it exists in build dir
+        let lib_in_build = build_dir.join(if target_os == "windows" {
+            if target_env == "gnu" { "libMNN.a" } else { "Release/mnn.lib" }
+        } else {
+            "libMNN.a"
+        });
+
+        if lib_in_build.exists() {
+            let dest = install_dir.join("lib").join(installed_lib.file_name().unwrap());
+            if !dest.exists() {
+                if let Err(e) = std::fs::copy(&lib_in_build, &dest) {
+                    if debug {
+                        println!("cargo:warning=mnn-sys: Failed to copy library: {}", e);
+                    }
+                }
+            }
+        }
+
+        // Use source include directory directly (most reliable)
+        let src_include = source_path.join("include");
+        if src_include.exists() {
+            (install_dir.join("lib"), src_include)
+        } else {
+            (install_dir.join("lib"), install_dir.join("include"))
+        }
+    };
 
     if debug {
         println!("cargo:warning=mnn-sys: MNN built successfully");
@@ -674,6 +946,13 @@ fn configure_platform(target_os: &str, target_env: &str) {
     }
 
     if cfg!(feature = "android") || target_os == "android" {
+        // Android requires explicit linking to C++ standard library
+        println!("cargo:rustc-link-lib=c++_static");
+        println!("cargo:rustc-link-lib=log"); // Android logging
+
+        // Link libc for stdout/stderr symbols (needed by KleidiAI)
+        println!("cargo:rustc-link-lib=c");
+
         if cfg!(feature = "opencl") {
             println!("cargo:rustc-link-lib=OpenCL");
         }
@@ -683,10 +962,11 @@ fn configure_platform(target_os: &str, target_env: &str) {
     }
 
     if cfg!(feature = "ios") || target_os == "ios" {
-        if cfg!(feature = "metal") {
-            println!("cargo:rustc-link-lib=framework=Metal");
-            println!("cargo:rustc-link-lib=framework=MetalKit");
-        }
+        // iOS always uses Metal by default
+        println!("cargo:rustc-link-lib=framework=Metal");
+        println!("cargo:rustc-link-lib=framework=MetalKit");
+        println!("cargo:rustc-link-lib=framework=Foundation");
+        println!("cargo:rustc-link-lib=framework=CoreGraphics");
     }
 }
 
