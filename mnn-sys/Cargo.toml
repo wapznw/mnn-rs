@@ -3,7 +3,14 @@ name = "mnn-sys"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 description = "Raw FFI bindings for Alibaba MNN (Mobile Neural Network) inference engine"
+readme = "README.md"
+keywords.workspace = true
+categories.workspace = true
+rust-version.workspace = true
+authors.workspace = true
 links = "mnn"
 
 [features]
@@ -27,9 +34,15 @@ int8 = []
 # Quantization
 quantization = []
 
+# x86 SIMD optimizations (only effective on x86/x86_64 targets)
+# Note: For 32-bit x86 (i686), SSE/AVX may cause issues, use with caution
+sse = []
+avx2 = []
+avx512 = []
+
 # Build options
-# Build MNN from source (requires cmake)
-build-from-source = ["cmake"]
+# Build MNN from source (requires cmake and num_cpus)
+build-from-source = ["cmake", "num_cpus"]
 # Use system-installed MNN
 system-mnn = []
 # Generate bindings using bindgen
@@ -44,7 +57,7 @@ bindgen = { workspace = true, optional = true }
 cmake = { workspace = true, optional = true }
 pkg-config = { workspace = true }
 cc = "1.0"
-num_cpus = "1.16"
+num_cpus = { version = "1.16", optional = true }
 
 [dependencies]
 
@@ -53,8 +66,5 @@ features = ["cpu"]
 
 # Instructions for building from source
 [package.metadata.mnn]
-# MNN source can be obtained by:
-# 1. Set MNN_SOURCE_PATH to point to existing MNN source directory
-# 2. Or let the build script clone from GitHub automatically
 repository = "https://github.com/alibaba/MNN.git"
 default_branch = "master"
