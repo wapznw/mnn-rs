@@ -514,7 +514,7 @@ dependencies = [
 
 [[package]]
 name = "mnn-rs"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "mnn-rs-sys",
  "tempfile",
@@ -524,7 +524,7 @@ dependencies = [
 
 [[package]]
 name = "mnn-rs-sys"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "bindgen",
  "cc",
