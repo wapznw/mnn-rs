@@ -151,6 +151,123 @@ jobs:
           path: artifact/
           retention-days: 7
 
+  # CUDA builds for Windows and Linux x86_64
+  build-windows-cuda:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup CUDA
+        uses: Jimver/cuda-toolkit@v0.2.21
+        with:
+          cuda: '12.4.0'
+
+      - name: Get MNN Source
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with CUDA
+        shell: bash
+        run: |
+          cmake -B build -S mnn-source \
+            -G "Visual Studio 17 2022" -A x64 \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_WIN_RUNTIME_MT=ON \
+            -DMNN_CUDA=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --config Release --parallel --target MNN
+          cmake --build build --config Release --target INSTALL
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/mnn.lib" ]; then
+            cp install/lib/mnn.lib artifact/lib/
+          elif [ -f "build/Release/mnn.lib" ]; then
+            cp build/Release/mnn.lib artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-x86_64-pc-windows-msvc-cuda
+          path: artifact/
+          retention-days: 7
+
+  build-linux-cuda:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Setup CUDA
+        uses: Jimver/cuda-toolkit@v0.2.21
+        with:
+          cuda: '12.4.0'
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with CUDA
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_CUDA=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --parallel --target MNN
+          cmake --install build
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-x86_64-unknown-linux-gnu-cuda
+          path: artifact/
+          retention-days: 7
+
   build-macos:
     runs-on: macos-latest
     strategy:
@@ -374,7 +491,7 @@ jobs:
           retention-days: 7
 
   release:
-    needs: [build-windows, build-linux, build-macos, build-android, build-ios, test-native, test-android, test-ios]
+    needs: [build-windows, build-linux, build-macos, build-android, build-ios, build-windows-cuda, build-linux-cuda, test-native, test-android, test-ios]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:

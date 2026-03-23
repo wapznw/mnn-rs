@@ -82,12 +82,32 @@ fn get_ndk_host_tag() -> &'static str {
     }
 }
 
+/// Get the prebuilt variant name based on enabled features
+fn get_prebuilt_variant() -> &'static str {
+    // Priority: cuda > opencl > vulkan > cpu (default)
+    // Metal is always included in macOS/iOS builds, no separate variant
+    if cfg!(feature = "cuda") {
+        "cuda"
+    } else if cfg!(feature = "opencl") {
+        "opencl"
+    } else if cfg!(feature = "vulkan") {
+        "vulkan"
+    } else {
+        ""
+    }
+}
+
 /// Download and extract prebuilt MNN binaries
 #[cfg(feature = "use-prebuilt")]
 fn download_prebuilt(target: &str, out_dir: &std::path::Path, debug: bool) -> Option<(PathBuf, PathBuf)> {
     use flate2::read::GzDecoder;
 
-    let prebuilt_dir = out_dir.join("mnn-prebuilt");
+    let variant = get_prebuilt_variant();
+    let prebuilt_dir = if variant.is_empty() {
+        out_dir.join("mnn-prebuilt")
+    } else {
+        out_dir.join(format!("mnn-prebuilt-{}", variant))
+    };
     let lib_dir = prebuilt_dir.join("lib");
     let include_dir = prebuilt_dir.join("include");
 
@@ -107,8 +127,13 @@ fn download_prebuilt(target: &str, out_dir: &std::path::Path, debug: bool) -> Op
         }
     }
 
-    // Construct download URL
-    let archive_name = format!("mnn-{}.tar.gz", target);
+    // Construct download URL with variant suffix
+    let archive_name = if variant.is_empty() {
+        format!("mnn-{}.tar.gz", target)
+    } else {
+        format!("mnn-{}-{}.tar.gz", target, variant)
+    };
+
     let url = env::var("MNN_PREBUILT_URL").unwrap_or_else(|_| {
         format!(
             "https://github.com/{}/releases/download/v{}/{}",
