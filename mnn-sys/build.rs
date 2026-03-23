@@ -378,6 +378,11 @@ fn main() {
             if compiler.file_name().unwrap() == format!("clang++{}", exe_suffix).as_str() {
                 build.flag(format!("--target={}", target));
             }
+            // Set the archiver for Android (llvm-ar)
+            let ar_path = toolchain_bin.join(format!("llvm-ar{}", exe_suffix));
+            if ar_path.exists() {
+                build.archiver(&ar_path);
+            }
         } else {
             panic!(
                 "Could not find Android C++ compiler in NDK.\n\

@@ -473,6 +473,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
+        id: setup-ndk
 
       - name: Download artifact
         uses: actions/download-artifact@v4
@@ -481,10 +482,11 @@ jobs:
           path: mnn-prebuilt
 
       - name: Test linking
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: |
           export MNN_LIB_DIR="$(pwd)/mnn-prebuilt/lib"
           export MNN_INCLUDE_DIR="$(pwd)/mnn-prebuilt/include"
-          export ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME
           cargo check --target ${{ matrix.target }}
 
   # Test iOS cross-compilation
