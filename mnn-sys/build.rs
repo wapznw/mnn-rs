@@ -354,10 +354,11 @@ fn main() {
         // 1. With API version suffix (e.g., aarch64-linux-android21-clang++)
         // 2. Without version suffix (e.g., aarch64-linux-android-clang++)
         // 3. Generic clang++ with --target flag
+        let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
         let compilers_to_try = [
-            toolchain_bin.join(format!("{}21-clang++.exe", tool_prefix)),
-            toolchain_bin.join(format!("{}-clang++.exe", tool_prefix)),
-            toolchain_bin.join("clang++.exe"),
+            toolchain_bin.join(format!("{}21-clang++{}", tool_prefix, exe_suffix)),
+            toolchain_bin.join(format!("{}-clang++{}", tool_prefix, exe_suffix)),
+            toolchain_bin.join(format!("clang++{}", exe_suffix)),
         ];
 
         let mut found_compiler = None;
@@ -374,7 +375,7 @@ fn main() {
         if let Some(compiler) = found_compiler {
             build.compiler(&compiler);
             // If using generic clang++, add target flag
-            if compiler.file_name().unwrap() == "clang++.exe" {
+            if compiler.file_name().unwrap() == format!("clang++{}", exe_suffix).as_str() {
                 build.flag(format!("--target={}", target));
             }
         } else {

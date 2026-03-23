@@ -419,9 +419,9 @@ jobs:
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
           - target: x86_64-apple-darwin
-            os: macos-13  # Intel Mac
+            os: macos-latest  # Cross-compile for x86_64 on Apple Silicon
           - target: aarch64-apple-darwin
-            os: macos-latest  # Apple Silicon
+            os: macos-latest  # Apple Silicon native
     steps:
       - uses: actions/checkout@v4
 
