@@ -179,6 +179,8 @@ jobs:
         run: |
           cmake -B build -S mnn-source \
             -G "Visual Studio 17 2022" -A x64 \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DCMAKE_CUDA_STANDARD=17 \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_WIN_RUNTIME_MT=ON \
             -DMNN_CUDA=ON \
@@ -237,6 +239,8 @@ jobs:
         run: |
           cmake -B build -S mnn-source -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_STANDARD=17 \
+            -DCMAKE_CUDA_STANDARD=17 \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_CUDA=ON \
             -DMNN_BUILD_TOOLS=OFF \
