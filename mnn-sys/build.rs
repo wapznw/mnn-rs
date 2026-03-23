@@ -355,10 +355,14 @@ fn main() {
 
         let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
 
-        // Set AR environment variable for cc crate
+        // Set AR tool path - use llvm-ar from NDK
         let ar_path = toolchain_bin.join(format!("llvm-ar{}", exe_suffix));
         if ar_path.exists() {
-            println!("cargo:rustc-env=AR={}", ar_path.display());
+            // Set for cc-rs to find the archiver
+            build.archiver(&ar_path);
+            if debug_build {
+                println!("cargo:warning=mnn-sys: Using archiver: {:?}", ar_path);
+            }
         }
 
         // Use clang with proper target and API level
