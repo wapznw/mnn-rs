@@ -1,0 +1,336 @@
+name: Build Prebuilt Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      mnn_version:
+        description: 'MNN version/tag to build (leave empty for latest)'
+        required: false
+        default: ''
+      upload_artifacts:
+        description: 'Upload artifacts (for testing without release)'
+        required: false
+        default: 'true'
+        type: boolean
+
+env:
+  CMAKE_BUILD_TYPE: Release
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            arch: x64
+          - target: i686-pc-windows-msvc
+            arch: Win32
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Get MNN Source
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN
+        shell: bash
+        run: |
+          cmake -B build -S mnn-source \
+            -G "Visual Studio 17 2022" -A ${{ matrix.arch }} \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_WIN_RUNTIME_MT=ON \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --config Release --target install -- /m
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          # Find the library file
+          if [ -f "install/lib/mnn.lib" ]; then
+            cp install/lib/mnn.lib artifact/lib/
+          elif [ -f "build/Release/mnn.lib" ]; then
+            cp build/Release/mnn.lib artifact/lib/
+          elif [ -f "build/mnn.lib" ]; then
+            cp build/mnn.lib artifact/lib/
+          fi
+          # Also copy MNN headers from source if not in install
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-${{ matrix.target }}
+          path: artifact/
+          retention-days: 7
+
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch: native
+          - target: aarch64-unknown-linux-gnu
+            arch: aarch64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          fi
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN
+        run: |
+          CMAKE_ARGS=""
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            CMAKE_ARGS="-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++"
+          fi
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DCMAKE_INSTALL_PREFIX=install \
+            $CMAKE_ARGS
+          cmake --build build --target install
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          # Copy headers from source if needed
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-${{ matrix.target }}
+          path: artifact/
+          retention-days: 7
+
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            arch: x86_64
+          - target: aarch64-apple-darwin
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake ninja
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_METAL=ON \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --target install
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          # Copy headers from source if needed
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-${{ matrix.target }}
+          path: artifact/
+          retention-days: 7
+
+  build-android:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - abi: arm64-v8a
+            target: aarch64-linux-android
+          - abi: armeabi-v7a
+            target: armv7-linux-androideabi
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=${{ matrix.abi }} \
+            -DANDROID_PLATFORM=android-24 \
+            -DANDROID_STL=c++_static \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_KLEIDIAI=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --target install
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          # Copy headers from source if needed
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-${{ matrix.target }}
+          path: artifact/
+          retention-days: 7
+
+  build-ios:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-apple-ios
+            platform: OS64
+          - target: aarch64-apple-ios-sim
+            platform: SIMULATORARM64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake ninja
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DPLATFORM=${{ matrix.platform }} \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_METAL=ON \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --target install
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          # Copy headers from source if needed
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-${{ matrix.target }}
+          path: artifact/
+          retention-days: 7
+
+  release:
+    needs: [build-windows, build-linux, build-macos, build-android, build-ios]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release archives
+        run: |
+          cd artifacts
+          for dir in mnn-*/; do
+            name="${dir%/}"
+            tar -czvf "${name}.tar.gz" -C "$dir" .
+            echo "Created ${name}.tar.gz"
+          done
+          ls -la *.tar.gz
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/*.tar.gz
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

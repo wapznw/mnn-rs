@@ -3,10 +3,22 @@
 //! This script handles linking to the MNN library, supporting:
 //! - Static and dynamic linking
 //! - Multiple backends (CPU, CUDA, OpenCL, Vulkan, Metal)
+//! - Prebuilt binary download (default)
 //! - Build from source or use pre-installed library
 //! - Cross-platform builds
 //!
-//! # Building from Source
+//! # Build Modes (in priority order)
+//!
+//! 1. **use-prebuilt** (default): Download prebuilt binaries from GitHub Releases
+//! 2. **build-from-source**: Build MNN locally using CMake
+//! 3. **system-mnn**: Use system-installed MNN library
+//!
+//! ## Prebuilt Binaries
+//!
+//! Prebuilt binaries are automatically downloaded from GitHub Releases.
+//! Set `MNN_PREBUILT_URL` to use a custom download URL.
+//!
+//! ## Building from Source
 //!
 //! ## Source Code Location
 //!
@@ -22,8 +34,11 @@
 //! ## Usage
 //!
 //! ```bash
-//! # Let the script manage everything (recommended)
-//! cargo build --features build-from-source
+//! # Default: download prebuilt binaries
+//! cargo build
+//!
+//! # Build from source instead
+//! cargo build --features build-from-source --no-default-features
 //!
 //! # Use existing MNN source
 //! MNN_SOURCE_PATH=/path/to/mnn cargo build --features build-from-source
@@ -34,9 +49,15 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::env;
+use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
+
+/// MNN version for prebuilt binaries - sync with crate version
+const MNN_VERSION: &str = "0.1.1";
+/// GitHub repository for prebuilt downloads
+const GITHUB_REPO: &str = "wapznw/mnn-rs";
 
 /// Get the NDK host tag based on the current host platform
 fn get_ndk_host_tag() -> &'static str {
@@ -61,6 +82,101 @@ fn get_ndk_host_tag() -> &'static str {
     }
 }
 
+/// Download and extract prebuilt MNN binaries
+#[cfg(feature = "use-prebuilt")]
+fn download_prebuilt(target: &str, out_dir: &std::path::Path, debug: bool) -> Option<(PathBuf, PathBuf)> {
+    use flate2::read::GzDecoder;
+
+    let prebuilt_dir = out_dir.join("mnn-prebuilt");
+    let lib_dir = prebuilt_dir.join("lib");
+    let include_dir = prebuilt_dir.join("include");
+
+    // Check if already downloaded and valid
+    if lib_dir.exists() && include_dir.exists() {
+        // Verify library file exists
+        let lib_exists = if cfg!(target_os = "windows") {
+            lib_dir.join("mnn.lib").exists() || lib_dir.join("MNN.lib").exists()
+        } else {
+            lib_dir.join("libMNN.a").exists()
+        };
+        if lib_exists {
+            if debug {
+                println!("cargo:warning=mnn-sys: Using cached prebuilt at {:?}", prebuilt_dir);
+            }
+            return Some((lib_dir, include_dir));
+        }
+    }
+
+    // Construct download URL
+    let archive_name = format!("mnn-{}.tar.gz", target);
+    let url = env::var("MNN_PREBUILT_URL").unwrap_or_else(|_| {
+        format!(
+            "https://github.com/{}/releases/download/v{}/{}",
+            GITHUB_REPO, MNN_VERSION, archive_name
+        )
+    });
+
+    println!("cargo:warning=mnn-sys: Downloading prebuilt MNN from: {}", url);
+
+    // Download the archive
+    let response = match ureq::get(&url).call() {
+        Ok(r) => r,
+        Err(e) => {
+            println!("cargo:warning=mnn-sys: Failed to download prebuilt: {}", e);
+            println!("cargo:warning=mnn-sys: Falling back to build-from-source or system-mnn");
+            return None;
+        }
+    };
+
+    if response.status() != 200 {
+        println!("cargo:warning=mnn-sys: Download failed with HTTP {}", response.status());
+        return None;
+    }
+
+    // Create prebuilt directory
+    fs::create_dir_all(&prebuilt_dir).ok()?;
+
+    // Extract the archive
+    let reader = response.into_reader();
+    let mut decoder = GzDecoder::new(reader);
+    let mut archive = tar::Archive::new(&mut decoder);
+
+    if let Err(e) = archive.unpack(&prebuilt_dir) {
+        println!("cargo:warning=mnn-sys: Failed to extract archive: {}", e);
+        // Clean up partial extraction
+        let _ = fs::remove_dir_all(&prebuilt_dir);
+        return None;
+    }
+
+    // Verify extraction was successful
+    if !lib_dir.exists() {
+        // Try to find extracted files (archive might not have top-level directory)
+        if let Ok(entries) = fs::read_dir(&prebuilt_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    // Check if this directory contains lib/include
+                    if path.join("lib").exists() {
+                        return Some((path.join("lib"), path.join("include")));
+                    }
+                }
+            }
+        }
+    }
+
+    if debug {
+        println!("cargo:warning=mnn-sys: Prebuilt extracted to {:?}", prebuilt_dir);
+    }
+
+    Some((lib_dir, include_dir))
+}
+
+/// Stub for when use-prebuilt feature is not enabled
+#[cfg(not(feature = "use-prebuilt"))]
+fn download_prebuilt(_target: &str, _out_dir: &std::path::Path, _debug: bool) -> Option<(PathBuf, PathBuf)> {
+    None
+}
+
 fn main() {
     // Check if we should print debug info
     let debug_build = env::var("MNN_DEBUG_BUILD").is_ok();
@@ -74,6 +190,7 @@ fn main() {
     let target_os = get_target_os(&target);
     let target_env = get_target_env(&target);
     let target_arch = get_target_arch(&target);
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     if debug_build {
         println!("cargo:warning=mnn-sys: Target: {}", target);
@@ -88,6 +205,7 @@ fn main() {
     let mnn_include_dir = env::var("MNN_INCLUDE_DIR").ok();
     let _mnn_use_system = env::var("MNN_USE_SYSTEM").is_ok() || cfg!(feature = "system-mnn");
     let build_from_source = cfg!(feature = "build-from-source");
+    let use_prebuilt = cfg!(feature = "use-prebuilt");
 
     // Determine linking mode
     let static_link = cfg!(feature = "static");
@@ -100,46 +218,51 @@ fn main() {
     // If no link mode specified, default to static
     let use_static = !dynamic_link;
 
-    // Build from source if requested
-    let (lib_dir, include_dir) = if build_from_source {
-        // Get the project's target directory (shared across all builds)
-        let target_dir = get_target_directory();
-
-        // Source path: use MNN_SOURCE_PATH or shared location
-        let source_path = match mnn_source_path {
-            Some(path) => PathBuf::from(path),
-            None => {
-                // Use shared source directory in project's target folder
-                // This is shared across all build targets
-                let shared_source = target_dir.join("mnn-source");
-                if !shared_source.exists() {
-                    clone_mnn_from_github(&shared_source, debug_build);
-                } else if debug_build {
-                    println!("cargo:warning=mnn-sys: Using cached MNN source at {:?}", shared_source);
-                }
-                shared_source
+    // Priority: prebuilt -> build-from-source -> system-mnn -> env vars
+    let (lib_dir, include_dir) = if use_prebuilt && !build_from_source {
+        // Try to download prebuilt binaries
+        if let Some((lib, inc)) = download_prebuilt(&target, &out_dir, debug_build) {
+            if debug_build {
+                println!("cargo:warning=mnn-sys: Using prebuilt binaries");
             }
-        };
-
-        // Build directory: per-target to support cross-compilation
-        // Format: target/mnn-build/<target-triple>/
-        let build_dir = target_dir
-            .join("mnn-build")
-            .join(&target);
-
-        let (lib_dir, include_dir) = build_mnn_from_source(
-            &source_path,
-            &build_dir,
+            (Some(lib), Some(inc))
+        } else {
+            // Fall back to build-from-source or env vars
+            if debug_build {
+                println!("cargo:warning=mnn-sys: Prebuilt download failed, trying fallback");
+            }
+            get_lib_and_include_dirs(
+                build_from_source,
+                &mnn_source_path,
+                &mnn_lib_dir,
+                &mnn_include_dir,
+                use_static,
+                debug_build,
+                &target,
+                &target_os,
+                &target_env,
+                &target_arch,
+            )
+        }
+    } else if build_from_source {
+        get_lib_and_include_dirs(
+            true,
+            &mnn_source_path,
+            &mnn_lib_dir,
+            &mnn_include_dir,
             use_static,
             debug_build,
             &target,
             &target_os,
             &target_env,
             &target_arch,
-        );
-        (Some(lib_dir), Some(include_dir))
+        )
     } else {
-        (mnn_lib_dir.map(PathBuf::from), mnn_include_dir.map(PathBuf::from))
+        // Use env vars or system library
+        (
+            mnn_lib_dir.map(PathBuf::from),
+            mnn_include_dir.map(PathBuf::from),
+        )
     };
 
     // Compile the C++ wrapper
@@ -147,22 +270,24 @@ fn main() {
     let wrapper_cpp = wrapper_dir.join("mnn_wrapper.cpp");
 
     // Check if we have MNN headers available
-    if include_dir.is_none() && !build_from_source {
+    if include_dir.is_none() {
         panic!(
             "MNN headers not found!\n\
             \n\
             Please do one of the following:\n\
-            1. Enable 'build-from-source' feature to auto-build MNN:\n\
-               cargo build --features build-from-source\n\
-            \n\
-            2. Set MNN_INCLUDE_DIR and MNN_LIB_DIR environment variables:\n\
-               set MNN_INCLUDE_DIR=/path/to/mnn/include\n\
-               set MNN_LIB_DIR=/path/to/mnn/lib\n\
+            1. Use default features to download prebuilt binaries:\n\
                cargo build\n\
             \n\
-            3. Set MNN_SOURCE_PATH to use existing MNN source:\n\
+            2. Enable 'build-from-source' feature to build locally:\n\
+               cargo build --features build-from-source --no-default-features\n\
+            \n\
+            3. Set MNN_INCLUDE_DIR and MNN_LIB_DIR environment variables:\n\
+               set MNN_INCLUDE_DIR=/path/to/mnn/include\n\
+               set MNN_LIB_DIR=/path/to/mnn/lib\n\
+            \n\
+            4. Set MNN_SOURCE_PATH to use existing MNN source:\n\
                set MNN_SOURCE_PATH=/path/to/mnn/source\n\
-               cargo build --features build-from-source"
+               cargo build --features build-from-source --no-default-features"
         );
     }
 
@@ -278,8 +403,8 @@ fn main() {
     // Configure linking
     if let Some(ref lib_path) = lib_dir {
         println!("cargo:rustc-link-search=native={}", lib_path.display());
-    } else if !build_from_source {
-        // Try common library paths
+    } else {
+        // Try common library paths (for system-mnn mode)
         search_common_paths(use_static, &target_os);
     }
 
@@ -293,13 +418,13 @@ fn main() {
         println!("cargo:rustc-link-lib={}=mnn", link_type);
     }
 
-    // Print help message if library not found and not building from source
-    if lib_dir.is_none() && !build_from_source {
+    // Print help message if library not found
+    if lib_dir.is_none() {
         println!("cargo:warning=mnn-sys: MNN library not found in MNN_LIB_DIR or common paths");
         println!("cargo:warning=mnn-sys: Please do one of the following:");
-        println!("cargo:warning=  1. Set MNN_LIB_DIR to the directory containing libmnn.a or mnn.lib");
-        println!("cargo:warning=  2. Set MNN_SOURCE_PATH and use 'build-from-source' feature");
-        println!("cargo:warning=  3. Use --features build-from-source to auto-clone and build MNN");
+        println!("cargo:warning=  1. Use default features to download prebuilt binaries: cargo build");
+        println!("cargo:warning=  2. Set MNN_LIB_DIR to the directory containing libmnn.a or mnn.lib");
+        println!("cargo:warning=  3. Use --features build-from-source to build MNN locally");
         println!("cargo:warning=See https://github.com/alibaba/MNN for MNN installation instructions");
     }
 
@@ -314,6 +439,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=MNN_LIB_DIR");
     println!("cargo:rerun-if-env-changed=MNN_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=MNN_USE_SYSTEM");
+    println!("cargo:rerun-if-env-changed=MNN_PREBUILT_URL");
     println!("cargo:rerun-if-env-changed=CUDA_PATH");
     println!("cargo:rerun-if-env-changed=ANDROID_NDK_HOME");
     println!("cargo:rerun-if-env-changed=NDK_HOME");
@@ -428,7 +554,67 @@ fn clone_mnn_from_github(dest: &std::path::Path, debug: bool) {
     }
 }
 
+/// Get library and include directories, with fallback to build-from-source
+fn get_lib_and_include_dirs(
+    build_from_source: bool,
+    mnn_source_path: &Option<String>,
+    mnn_lib_dir: &Option<String>,
+    mnn_include_dir: &Option<String>,
+    use_static: bool,
+    debug: bool,
+    target: &str,
+    target_os: &str,
+    target_env: &str,
+    target_arch: &str,
+) -> (Option<PathBuf>, Option<PathBuf>) {
+    if build_from_source {
+        // Get the project's target directory (shared across all builds)
+        let target_dir = get_target_directory();
+
+        // Source path: use MNN_SOURCE_PATH or shared location
+        let source_path = match mnn_source_path {
+            Some(path) => PathBuf::from(path),
+            None => {
+                // Use shared source directory in project's target folder
+                // This is shared across all build targets
+                let shared_source = target_dir.join("mnn-source");
+                if !shared_source.exists() {
+                    clone_mnn_from_github(&shared_source, debug);
+                } else if debug {
+                    println!("cargo:warning=mnn-sys: Using cached MNN source at {:?}", shared_source);
+                }
+                shared_source
+            }
+        };
+
+        // Build directory: per-target to support cross-compilation
+        // Format: target/mnn-build/<target-triple>/
+        let build_dir = target_dir
+            .join("mnn-build")
+            .join(target);
+
+        let (lib_dir, include_dir) = build_mnn_from_source(
+            &source_path,
+            &build_dir,
+            use_static,
+            debug,
+            target,
+            target_os,
+            target_env,
+            target_arch,
+        );
+        (Some(lib_dir), Some(include_dir))
+    } else {
+        // Use environment variables
+        (
+            mnn_lib_dir.as_ref().map(PathBuf::from),
+            mnn_include_dir.as_ref().map(PathBuf::from),
+        )
+    }
+}
+
 /// Compute configuration hash for cache invalidation
+#[cfg(feature = "build-from-source")]
 fn compute_config_hash(
     target: &str,
     target_os: &str,

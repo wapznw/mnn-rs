@@ -1,6 +1,6 @@
 [package]
 name = "mnn-rs-sys"
-version = "0.1.1"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -14,7 +14,7 @@ authors.workspace = true
 links = "mnn"
 
 [features]
-default = ["cpu", "static", "build-from-source"]
+default = ["cpu", "static", "use-prebuilt"]
 
 # Linking method
 static = []
@@ -41,6 +41,8 @@ avx2 = []
 avx512 = []
 
 # Build options
+# Use prebuilt binaries (default) - downloads from GitHub Releases
+use-prebuilt = ["ureq", "tar", "flate2"]
 # Build MNN from source (requires cmake and num_cpus)
 build-from-source = ["cmake", "num_cpus"]
 # Use system-installed MNN
@@ -58,11 +60,15 @@ cmake = { workspace = true, optional = true }
 pkg-config = { workspace = true }
 cc = "1.0"
 num_cpus = { version = "1.16", optional = true }
+# Dependencies for downloading prebuilt binaries
+ureq = { version = "2.9", optional = true }
+tar = { version = "0.4", optional = true }
+flate2 = { version = "1.0", optional = true }
 
 [dependencies]
 
 [package.metadata.docs.rs]
-features = ["cpu"]
+features = ["cpu", "use-prebuilt"]
 
 # Instructions for building from source
 [package.metadata.mnn]

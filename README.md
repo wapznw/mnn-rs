@@ -10,19 +10,44 @@ Rust bindings for [MNN](https://github.com/alibaba/MNN) (Mobile Neural Network),
 
 - **Safe Rust API**: All MNN operations are wrapped in safe Rust types with proper error handling
 - **Cross-platform**: Supports Windows, Linux, macOS, Android, and iOS
+- **Prebuilt Binaries**: Automatically download prebuilt binaries - no CMake or C++ compiler required!
 - **Multiple Backends**: CPU, CUDA, OpenCL, Vulkan, and Metal
 - **Static/Dynamic Linking**: Choose between static or dynamic linking
 - **Async Support**: Optional async API with Tokio integration
-- **Build from Source**: Automatically clone and build MNN from GitHub
+- **Build from Source**: Option to build MNN locally when needed
 
 ## Quick Start
 
 ### Default Build (Recommended)
 
-By default, the crate will automatically clone and build MNN from GitHub:
+By default, the crate will automatically download prebuilt MNN binaries from GitHub Releases:
 
 ```bash
 cargo build
+```
+
+**No prerequisites required!** The prebuilt binaries are available for:
+- Windows (x86_64 MSVC, x86 MSVC)
+- Linux (x86_64, aarch64)
+- macOS (x86_64 Intel, aarch64 Apple Silicon)
+- Android (arm64-v8a, armeabi-v7a)
+- iOS (arm64 device, arm64 simulator)
+
+### Custom Prebuilt URL
+
+You can specify a custom download URL for prebuilt binaries:
+
+```bash
+export MNN_PREBUILT_URL=https://your-server.com/mnn-x86_64-pc-windows-msvc.tar.gz
+cargo build
+```
+
+### Building from Source
+
+If you need to build MNN locally (e.g., for custom build options):
+
+```bash
+cargo build --features build-from-source --no-default-features
 ```
 
 This requires:
@@ -32,14 +57,14 @@ This requires:
 
 ### Using Pre-built MNN
 
-If you have a pre-built MNN library, you can disable the auto-build:
+If you have a pre-built MNN library, you can use it directly:
 
 ```bash
 # Set MNN library paths
 export MNN_LIB_DIR=/path/to/mnn/lib
 export MNN_INCLUDE_DIR=/path/to/mnn/include
 
-# Build without build-from-source feature
+# Build without auto-download
 cargo build --no-default-features --features cpu,static
 ```
 
@@ -132,11 +157,12 @@ async fn main() -> Result<(), MnnError> {
 
 ### Build Options
 
-| Feature | Description |
-|---------|-------------|
-| `build-from-source` | Automatically clone and build MNN from GitHub |
-| `system-mnn` | Use system-installed MNN |
-| `generate-bindings` | Generate FFI bindings using bindgen |
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `use-prebuilt` | ✓ | Download prebuilt MNN binaries from GitHub Releases |
+| `build-from-source` | | Build MNN from source (requires CMake, C++ compiler) |
+| `system-mnn` | | Use system-installed MNN library |
+| `generate-bindings` | | Generate FFI bindings using bindgen |
 
 ### Async Support
 
@@ -155,12 +181,15 @@ See the `examples/` directory for more usage examples:
 ```bash
 # Run basic inference example
 cargo run --example basic_inference -- /path/to/model.mnn
-
-# Run with build-from-source
-cargo run --features build-from-source --example basic_inference -- /path/to/model.mnn
 ```
 
 ## Cross-Compilation
+
+Prebuilt binaries are available for most cross-compilation targets. If prebuilt binaries are not available for your target, enable `build-from-source`:
+
+```bash
+cargo build --target aarch64-linux-android --features build-from-source --no-default-features
+```
 
 ### Android
 
@@ -168,22 +197,23 @@ cargo run --features build-from-source --example basic_inference -- /path/to/mod
 # Install Android target
 rustup target add aarch64-linux-android
 
-# Set Android NDK path (required)
-export ANDROID_NDK_HOME=/path/to/android-ndk
-
-# Build for Android (requires Ninja)
+# Build for Android (uses prebuilt binaries by default)
 cargo build --target aarch64-linux-android
-```
 
-**Android Requirements:**
-- Android NDK (set `ANDROID_NDK_HOME` or `NDK_HOME` environment variable)
-- Ninja build system (`choco install ninja` on Windows, `brew install ninja` on macOS)
+# Or build from source (requires NDK and Ninja)
+export ANDROID_NDK_HOME=/path/to/android-ndk
+cargo build --target aarch64-linux-android --features build-from-source --no-default-features
+```
 
 **Supported Android targets:**
 - `aarch64-linux-android` (arm64-v8a)
 - `armv7-linux-androideabi` (armeabi-v7a)
 - `x86_64-linux-android`
 - `i686-linux-android`
+
+**Building from source requirements:**
+- Android NDK (set `ANDROID_NDK_HOME` or `NDK_HOME` environment variable)
+- Ninja build system (`choco install ninja` on Windows, `brew install ninja` on macOS)
 
 ### iOS
 
@@ -192,7 +222,7 @@ cargo build --target aarch64-linux-android
 rustup target add aarch64-apple-ios
 rustup target add aarch64-apple-ios-sim
 
-# Build for iOS device
+# Build for iOS device (uses prebuilt binaries by default)
 cargo build --target aarch64-apple-ios
 
 # Build for iOS simulator (Apple Silicon Macs)
@@ -201,10 +231,6 @@ cargo build --target aarch64-apple-ios-sim
 # Build for iOS simulator (Intel Macs)
 cargo build --target x86_64-apple-ios
 ```
-
-**iOS Requirements:**
-- Xcode with iOS SDK
-- Ninja build system (recommended: `brew install ninja`)
 
 **Supported iOS targets:**
 - `aarch64-apple-ios` (iOS device)
@@ -247,7 +273,8 @@ cargo build --target x86_64-pc-windows-gnu
 
 | Variable | Description |
 |----------|-------------|
-| `MNN_SOURCE_PATH` | Path to MNN source directory |
+| `MNN_PREBUILT_URL` | Custom URL for prebuilt MNN binaries |
+| `MNN_SOURCE_PATH` | Path to MNN source directory (for build-from-source) |
 | `MNN_LIB_DIR` | Path to pre-built MNN library |
 | `MNN_INCLUDE_DIR` | Path to MNN headers |
 | `MNN_DEBUG_BUILD` | Print debug information during build |

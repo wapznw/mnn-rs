@@ -3,7 +3,7 @@ resolver = "2"
 members = ["mnn-sys"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/wapznw/mnn-rs"
@@ -37,7 +37,7 @@ authors.workspace = true
 documentation = "https://docs.rs/mnn-rs"
 
 [features]
-default = ["cpu", "static", "build-from-source"]
+default = ["cpu", "static", "use-prebuilt"]
 
 # Linking method
 static = ["mnn-rs-sys/static"]
@@ -67,7 +67,11 @@ avx512 = ["mnn-rs-sys/avx512"]
 async = ["dep:tokio"]
 
 # Build options
+# Use prebuilt binaries (default) - downloads from GitHub Releases
+use-prebuilt = ["mnn-rs-sys/use-prebuilt"]
+# Build from source - requires cmake and C++ compiler
 build-from-source = ["mnn-rs-sys/build-from-source"]
+# Use system-installed MNN
 system-mnn = ["mnn-rs-sys/system-mnn"]
 
 # Platform specific (usually auto-detected)
@@ -85,7 +89,7 @@ tokio = { workspace = true, features = ["full"] }
 tempfile = "3.0"
 
 [package.metadata.docs.rs]
-features = ["cpu", "build-from-source"]
+features = ["cpu", "use-prebuilt"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]
