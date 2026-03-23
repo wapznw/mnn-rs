@@ -51,8 +51,14 @@ jobs:
             -G "Visual Studio 17 2022" -A ${{ matrix.arch }} \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_WIN_RUNTIME_MT=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
             -DCMAKE_INSTALL_PREFIX=install
-          cmake --build build --config Release --target install -- /m
+          cmake --build build --config Release --parallel --target MNN
+          cmake --build build --config Release --target INSTALL
 
       - name: Package
         shell: bash
@@ -109,14 +115,20 @@ jobs:
         run: |
           CMAKE_ARGS=""
           if [ "${{ matrix.arch }}" = "aarch64" ]; then
-            CMAKE_ARGS="-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++"
+            CMAKE_ARGS="-DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=aarch64 -DMNN_USE_SSE=OFF -DMNN_ARM82=ON"
           fi
           cmake -B build -S mnn-source -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
             -DCMAKE_INSTALL_PREFIX=install \
             $CMAKE_ARGS
-          cmake --build build --target install
+          cmake --build build --parallel --target MNN
+          cmake --install build
 
       - name: Package
         run: |
@@ -162,13 +174,26 @@ jobs:
 
       - name: Build MNN
         run: |
+          # Set architecture-specific options
+          ARCH_OPTIONS=""
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            ARCH_OPTIONS="-DMNN_ARM82=ON -DMNN_USE_SSE=OFF"
+          fi
+
           cmake -B build -S mnn-source -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_METAL=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
             -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
-            -DCMAKE_INSTALL_PREFIX=install
-          cmake --build build --target install
+            -DCMAKE_INSTALL_PREFIX=install \
+            $ARCH_OPTIONS
+          cmake --build build --parallel --target MNN
+          cmake --install build
 
       - name: Package
         run: |
@@ -222,6 +247,14 @@ jobs:
 
       - name: Build MNN
         run: |
+          # Set ARM-specific options
+          ARM_OPTIONS=""
+          if [ "${{ matrix.abi }}" = "arm64-v8a" ]; then
+            ARM_OPTIONS="-DMNN_ARM82=ON"
+          elif [ "${{ matrix.abi }}" = "armeabi-v7a" ]; then
+            ARM_OPTIONS="-DMNN_USE_SSE=OFF"
+          fi
+
           cmake -B build -S mnn-source -G Ninja \
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=${{ matrix.abi }} \
@@ -229,8 +262,15 @@ jobs:
             -DANDROID_STL=c++_static \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_KLEIDIAI=OFF \
-            -DCMAKE_INSTALL_PREFIX=install
-          cmake --build build --target install
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install \
+            $ARM_OPTIONS
+          cmake --build build --parallel --target MNN
+          cmake --install build
 
       - name: Package
         run: |
@@ -276,13 +316,41 @@ jobs:
 
       - name: Build MNN
         run: |
+          # Set SDK and architecture based on target
+          if [ "${{ matrix.target }}" = "aarch64-apple-ios" ]; then
+            SDK="iphoneos"
+            ARCH="arm64"
+            ENABLE_METAL=ON
+          else
+            # Simulator - Metal works on M1+ Macs but requires different handling
+            SDK="iphonesimulator"
+            ARCH="arm64"
+            ENABLE_METAL=OFF
+          fi
+
           cmake -B build -S mnn-source -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS \
-            -DPLATFORM=${{ matrix.platform }} \
+            -DCMAKE_OSX_ARCHITECTURES=$ARCH \
+            -DCMAKE_OSX_SYSROOT=$SDK \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+            -DCMAKE_SKIP_INSTALL_ALL_DEPENDENCY=ON \
             -DMNN_BUILD_SHARED_LIBS=OFF \
-            -DMNN_METAL=ON \
+            -DMNN_METAL=$ENABLE_METAL \
+            -DMNN_ARM82=ON \
+            -DMNN_OPENCL=OFF \
+            -DMNN_OPENGL=OFF \
+            -DMNN_VULKAN=OFF \
+            -DMNN_CUDA=OFF \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DMNN_BUILD_CONVERTER=OFF \
+            -DMNN_BUILD_DEMO=OFF \
             -DCMAKE_INSTALL_PREFIX=install
-          cmake --build build --target install
+          cmake --build build --parallel --target MNN
+          cmake --install build
 
       - name: Package
         run: |
