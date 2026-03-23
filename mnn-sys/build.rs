@@ -54,8 +54,8 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
 
-/// MNN version for prebuilt binaries - sync with crate version
-const MNN_VERSION: &str = "0.1.1";
+/// MNN version for prebuilt binaries - automatically reads from Cargo.toml
+const MNN_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// GitHub repository for prebuilt downloads
 const GITHUB_REPO: &str = "wapznw/mnn-rs";
 
