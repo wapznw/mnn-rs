@@ -490,8 +490,370 @@ jobs:
           path: artifact/
           retention-days: 7
 
+  # GPU Backend builds
+  build-windows-opencl:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install OpenCL SDK
+        shell: bash
+        run: |
+          # Use NuGet to install OpenCL headers and loader
+          nuget install opencl-nug -Version 0.777.77 -OutputDirectory C:\opencl-nug
+
+      - name: Get MNN Source
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with OpenCL
+        shell: bash
+        run: |
+          cmake -B build -S mnn-source \
+            -G "Visual Studio 17 2022" -A x64 \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_WIN_RUNTIME_MT=ON \
+            -DMNN_OPENCL=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --config Release --parallel --target MNN
+          cmake --build build --config Release --target INSTALL
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/mnn.lib" ]; then
+            cp install/lib/mnn.lib artifact/lib/
+          elif [ -f "build/Release/mnn.lib" ]; then
+            cp build/Release/mnn.lib artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-x86_64-pc-windows-msvc-opencl
+          path: artifact/
+          retention-days: 7
+
+  build-windows-vulkan:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.1.1
+        with:
+          version: 1.3.261.1
+
+      - name: Get MNN Source
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with Vulkan
+        shell: bash
+        run: |
+          cmake -B build -S mnn-source \
+            -G "Visual Studio 17 2022" -A x64 \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_WIN_RUNTIME_MT=ON \
+            -DMNN_VULKAN=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --config Release --parallel --target MNN
+          cmake --build build --config Release --target INSTALL
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/mnn.lib" ]; then
+            cp install/lib/mnn.lib artifact/lib/
+          elif [ -f "build/Release/mnn.lib" ]; then
+            cp build/Release/mnn.lib artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-x86_64-pc-windows-msvc-vulkan
+          path: artifact/
+          retention-days: 7
+
+  build-linux-opencl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ocl-icd-opencl-dev opencl-headers
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with OpenCL
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_OPENCL=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --parallel --target MNN
+          cmake --install build
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-x86_64-unknown-linux-gnu-opencl
+          path: artifact/
+          retention-days: 7
+
+  build-linux-vulkan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build vulkan-tools libvulkan-dev
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with Vulkan
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_VULKAN=ON \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --parallel --target MNN
+          cmake --install build
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-x86_64-unknown-linux-gnu-vulkan
+          path: artifact/
+          retention-days: 7
+
+  build-android-opencl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with OpenCL for Android
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DANDROID_STL=c++_static \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_OPENCL=ON \
+            -DMNN_ARM82=ON \
+            -DMNN_KLEIDIAI=OFF \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --parallel --target MNN
+          cmake --install build
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-aarch64-linux-android-opencl
+          path: artifact/
+          retention-days: 7
+
+  build-android-vulkan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          add-to-path: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Get MNN Source
+        run: |
+          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Build MNN with Vulkan for Android
+        run: |
+          cmake -B build -S mnn-source -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DANDROID_STL=c++_static \
+            -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_VULKAN=ON \
+            -DMNN_ARM82=ON \
+            -DMNN_KLEIDIAI=OFF \
+            -DMNN_BUILD_TOOLS=OFF \
+            -DMNN_BUILD_TEST=OFF \
+            -DMNN_BUILD_BENCHMARK=OFF \
+            -DMNN_BUILD_QUANT=OFF \
+            -DMNN_BUILD_TRAIN=OFF \
+            -DCMAKE_INSTALL_PREFIX=install
+          cmake --build build --parallel --target MNN
+          cmake --install build
+
+      - name: Package
+        run: |
+          mkdir -p artifact/include artifact/lib
+          cp -r install/include/* artifact/include/ || true
+          if [ -f "install/lib/libMNN.a" ]; then
+            cp install/lib/libMNN.a artifact/lib/
+          elif [ -f "build/libMNN.a" ]; then
+            cp build/libMNN.a artifact/lib/
+          fi
+          if [ ! -d "artifact/include/MNN" ]; then
+            cp -r mnn-source/include/* artifact/include/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mnn-aarch64-linux-android-vulkan
+          path: artifact/
+          retention-days: 7
+
   release:
-    needs: [build-windows, build-linux, build-macos, build-android, build-ios, build-windows-cuda, build-linux-cuda, test-native, test-android, test-ios]
+    needs:
+      - build-windows
+      - build-linux
+      - build-macos
+      - build-android
+      - build-ios
+      - build-windows-opencl
+      - build-windows-vulkan
+      - build-linux-opencl
+      - build-linux-vulkan
+      - build-android-opencl
+      - build-android-vulkan
+      - test-native
+      - test-android
+      - test-ios
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:

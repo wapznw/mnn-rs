@@ -83,9 +83,8 @@ fn get_ndk_host_tag() -> &'static str {
 }
 
 /// Get the prebuilt variant name based on enabled features
+/// Priority: cuda > opencl > vulkan > cpu (default)
 fn get_prebuilt_variant() -> &'static str {
-    // Priority: cuda > opencl > vulkan > cpu (default)
-    // Metal is always included in macOS/iOS builds, no separate variant
     if cfg!(feature = "cuda") {
         "cuda"
     } else if cfg!(feature = "opencl") {
