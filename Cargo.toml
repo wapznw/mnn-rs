@@ -89,7 +89,10 @@ tokio = { workspace = true, features = ["full"] }
 tempfile = "3.0"
 
 [package.metadata.docs.rs]
-features = ["cpu", "use-prebuilt"]
+# docs.rs doesn't have network access or cmake, so native library linking is skipped
+# in build.rs when DOCS_RS is set. Use minimal features for documentation.
+features = ["cpu"]
+no-default-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [[example]]

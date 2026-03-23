@@ -68,7 +68,11 @@ flate2 = { version = "1.0", optional = true }
 [dependencies]
 
 [package.metadata.docs.rs]
-features = ["cpu", "use-prebuilt"]
+# docs.rs doesn't have network access or cmake, so we skip native library linking
+# in build.rs when DOCS_RS is set. Only need 'cpu' feature for documentation.
+features = ["cpu"]
+# No need to build native libraries for docs - build.rs will detect docs.rs environment
+no-default-features = true
 
 # Instructions for building from source
 [package.metadata.mnn]

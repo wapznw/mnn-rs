@@ -202,6 +202,14 @@ fn download_prebuilt(_target: &str, _out_dir: &std::path::Path, _debug: bool) ->
 }
 
 fn main() {
+    // Skip build process for docs.rs - it doesn't need to link native libraries
+    // docs.rs sets DOCS_RS=1 environment variable
+    if env::var("DOCS_RS").is_ok() {
+        println!("cargo:rustc-env=MNN_DOCS_RS=1");
+        println!("cargo:warning=mnn-sys: Building documentation on docs.rs, skipping native library linking");
+        return;
+    }
+
     // Check if we should print debug info
     let debug_build = env::var("MNN_DEBUG_BUILD").is_ok();
 
