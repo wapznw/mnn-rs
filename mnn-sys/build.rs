@@ -323,12 +323,15 @@ fn main() {
 
         let ndk_path = std::path::Path::new(&ndk_home);
 
+        // Android API level - must match what MNN was built with
+        let api_level = 24;
+
         // Determine toolchain path and prefix based on target
-        let tool_prefix = match &target_arch[..] {
-            "aarch64" => "aarch64-linux-android",
-            "armv7" | "arm" => "arm-linux-androideabi",
-            "x86_64" => "x86_64-linux-android",
-            "x86" => "i686-linux-android",
+        let (tool_prefix, target_triple) = match &target_arch[..] {
+            "aarch64" => ("aarch64-linux-android", "aarch64-linux-android"),
+            "armv7" | "arm" => ("arm-linux-androideabi", "armv7-linux-androideabi"),
+            "x86_64" => ("x86_64-linux-android", "x86_64-linux-android"),
+            "x86" => ("i686-linux-android", "i686-linux-android"),
             _ => panic!("Unsupported Android architecture: {}", target_arch),
         };
 
@@ -350,45 +353,32 @@ fn main() {
             );
         }
 
-        // Try different compiler names
-        // 1. With API version suffix (e.g., aarch64-linux-android21-clang++)
-        // 2. Without version suffix (e.g., aarch64-linux-android-clang++)
-        // 3. Generic clang++ with --target flag
         let exe_suffix = if cfg!(target_os = "windows") { ".exe" } else { "" };
-        let compilers_to_try = [
-            toolchain_bin.join(format!("{}21-clang++{}", tool_prefix, exe_suffix)),
-            toolchain_bin.join(format!("{}-clang++{}", tool_prefix, exe_suffix)),
-            toolchain_bin.join(format!("clang++{}", exe_suffix)),
-        ];
 
-        let mut found_compiler = None;
-        for compiler_path in &compilers_to_try {
-            if compiler_path.exists() {
-                found_compiler = Some(compiler_path.clone());
-                if debug_build {
-                    println!("cargo:warning=mnn-sys: Found Android C++ compiler: {:?}", compiler_path);
-                }
-                break;
-            }
+        // Set AR environment variable for cc crate
+        let ar_path = toolchain_bin.join(format!("llvm-ar{}", exe_suffix));
+        if ar_path.exists() {
+            println!("cargo:rustc-env=AR={}", ar_path.display());
         }
 
-        if let Some(compiler) = found_compiler {
-            build.compiler(&compiler);
-            // If using generic clang++, add target flag
-            if compiler.file_name().unwrap() == format!("clang++{}", exe_suffix).as_str() {
-                build.flag(format!("--target={}", target));
-            }
-            // Set the archiver for Android (llvm-ar)
-            let ar_path = toolchain_bin.join(format!("llvm-ar{}", exe_suffix));
-            if ar_path.exists() {
-                build.archiver(&ar_path);
-            }
+        // Use clang with proper target and API level
+        let clang_path = toolchain_bin.join(format!("clang++{}", exe_suffix));
+        if clang_path.exists() {
+            build.compiler(&clang_path);
+            // Set target with API level
+            build.flag(format!("--target={}{}", target_triple, api_level));
+            build.flag(format!("--sysroot={}", ndk_path.join("toolchains").join("llvm").join("prebuilt").join(host_tag).join("sysroot").display()));
         } else {
             panic!(
-                "Could not find Android C++ compiler in NDK.\n\
-                Tried: {:?}",
-                compilers_to_try
+                "Could not find clang++ in NDK.\n\
+                Expected at: {:?}",
+                clang_path
             );
+        }
+
+        if debug_build {
+            println!("cargo:warning=mnn-sys: Android NDK: {:?}", ndk_path);
+            println!("cargo:warning=mnn-sys: Android target: {}{}", target_triple, api_level);
         }
     }
 

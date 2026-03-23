@@ -484,8 +484,7 @@ jobs:
         run: |
           export MNN_LIB_DIR="$(pwd)/mnn-prebuilt/lib"
           export MNN_INCLUDE_DIR="$(pwd)/mnn-prebuilt/include"
-          # ANDROID_NDK_HOME is set by nttld/setup-ndk action
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          export ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME
           cargo check --target ${{ matrix.target }}
 
   # Test iOS cross-compilation
