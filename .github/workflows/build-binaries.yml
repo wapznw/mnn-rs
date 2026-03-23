@@ -299,6 +299,7 @@ jobs:
 
           cmake -B build -S mnn-source -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_METAL=ON \
             -DMNN_BUILD_TOOLS=OFF \

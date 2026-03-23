@@ -1155,13 +1155,20 @@ fn configure_platform(target_os: &str, target_env: &str) {
     }
 
     if target_os == "macos" {
-        if cfg!(feature = "metal") {
-            println!("cargo:rustc-link-lib=framework=Metal");
-            println!("cargo:rustc-link-lib=framework=MetalKit");
-            println!("cargo:rustc-link-lib=framework=Foundation");
-        }
+        // macOS prebuilt binaries always have Metal enabled, so we always need these frameworks
+        println!("cargo:rustc-link-lib=framework=Metal");
+        println!("cargo:rustc-link-lib=framework=MetalKit");
+        println!("cargo:rustc-link-lib=framework=Foundation");
+        println!("cargo:rustc-link-lib=framework=CoreFoundation");
+        println!("cargo:rustc-link-lib=framework=CoreGraphics");
+        // Objective-C runtime is needed for Metal backend
+        println!("cargo:rustc-link-lib=objc");
+
         if cfg!(feature = "opencl") {
             println!("cargo:rustc-link-lib=framework=OpenCL");
+        }
+        if cfg!(feature = "vulkan") {
+            println!("cargo:rustc-link-lib=vulkan");
         }
     }
 
