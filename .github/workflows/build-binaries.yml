@@ -448,7 +448,7 @@ jobs:
         run: |
           export MNN_LIB_DIR="$(pwd)/mnn-prebuilt/lib"
           export MNN_INCLUDE_DIR="$(pwd)/mnn-prebuilt/include"
-          cargo check --target ${{ matrix.target }} --no-default-features --features cpu,static
+          cargo check --target ${{ matrix.target }}
 
   # Test Android cross-compilation
   test-android:
@@ -485,7 +485,7 @@ jobs:
           export MNN_LIB_DIR="$(pwd)/mnn-prebuilt/lib"
           export MNN_INCLUDE_DIR="$(pwd)/mnn-prebuilt/include"
           export ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME
-          cargo check --target ${{ matrix.target }} --no-default-features --features cpu,static,android
+          cargo check --target ${{ matrix.target }}
 
   # Test iOS cross-compilation
   test-ios:
@@ -514,4 +514,4 @@ jobs:
         run: |
           export MNN_LIB_DIR="$(pwd)/mnn-prebuilt/lib"
           export MNN_INCLUDE_DIR="$(pwd)/mnn-prebuilt/include"
-          cargo check --target ${{ matrix.target }} --no-default-features --features cpu,static,ios
+          cargo check --target ${{ matrix.target }}

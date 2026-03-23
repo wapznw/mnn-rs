@@ -218,8 +218,18 @@ fn main() {
     // If no link mode specified, default to static
     let use_static = !dynamic_link;
 
-    // Priority: prebuilt -> build-from-source -> system-mnn -> env vars
-    let (lib_dir, include_dir) = if use_prebuilt && !build_from_source {
+    // Priority: env vars -> prebuilt -> build-from-source -> system-mnn
+    // This allows testing with local artifacts without downloading
+    let (lib_dir, include_dir) = if mnn_lib_dir.is_some() && mnn_include_dir.is_some() {
+        // Use environment variables if both are set (highest priority for testing)
+        if debug_build {
+            println!("cargo:warning=mnn-sys: Using MNN_LIB_DIR and MNN_INCLUDE_DIR from environment");
+        }
+        (
+            mnn_lib_dir.as_ref().map(|p| PathBuf::from(p)),
+            mnn_include_dir.as_ref().map(|p| PathBuf::from(p)),
+        )
+    } else if use_prebuilt && !build_from_source {
         // Try to download prebuilt binaries
         if let Some((lib, inc)) = download_prebuilt(&target, &out_dir, debug_build) {
             if debug_build {
