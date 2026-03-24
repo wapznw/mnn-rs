@@ -99,7 +99,9 @@ pub use config::{DataFormat, MemoryMode, PowerMode, PrecisionMode, ScheduleConfi
 mod tensor;
 pub use tensor::{Tensor, TensorData, TensorInfo, TensorView};
 
+#[cfg(feature = "image-process")]
 mod image_process;
+#[cfg(feature = "image-process")]
 pub use image_process::{
     Filter, ImageConfig, ImageFormat, ImageProcess, Matrix, Wrap,
 };
@@ -115,7 +117,9 @@ pub use interpreter::AsyncInterpreter;
 mod utils;
 pub use utils::{calculate_element_count, calculate_tensor_size, convert_format};
 
+#[cfg(feature = "runtime")]
 mod runtime;
+#[cfg(feature = "runtime")]
 pub use runtime::{InterpreterRuntimeExt, RuntimeInfo};
 
 // Async module
@@ -143,7 +147,10 @@ pub mod prelude {
     pub use crate::interpreter::Interpreter;
     pub use crate::session::Session;
     pub use crate::tensor::{Tensor, TensorData, TensorInfo};
+    #[cfg(feature = "image-process")]
     pub use crate::image_process::{ImageConfig, ImageFormat, Filter};
+    #[cfg(feature = "runtime")]
+    pub use crate::runtime::RuntimeInfo;
 }
 
 /// Testing utilities (only available in tests).

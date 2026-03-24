@@ -47,10 +47,8 @@
 //! MNN_LIB_DIR=/path/to/mnn/lib MNN_INCLUDE_DIR=/path/to/mnn/include cargo build
 //! ```
 
-use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -347,6 +345,38 @@ fn main() {
         }
     }
 
+    // Feature-specific compile definitions
+    // Note: image-process requires MNN with CV module (included in prebuilt binaries)
+    if cfg!(feature = "image-process") {
+        build.define("MNN_IMAGE_PROCESS", None);
+        println!("cargo:rustc-cfg=feature=\"image-process\"");
+    }
+    // Note: module feature requires MNN with training module (Express/Module)
+    // Only enable when building from source, as prebuilt binaries don't include it
+    if cfg!(feature = "module") && cfg!(feature = "build-from-source") {
+        build.define("MNN_MODULE_ENABLED", None);
+        println!("cargo:rustc-cfg=feature=\"module\"");
+    } else if cfg!(feature = "module") {
+        // Warn if module feature is used with prebuilt binaries
+        println!("cargo:warning=mnn-sys: 'module' feature requires MNN with training module. Skipping - use --features build-from-source to enable.");
+    }
+    // Note: runtime feature requires MNN with RuntimeManager (Express::Executor)
+    // Only enable when building from source, as prebuilt binaries don't include it
+    if cfg!(feature = "runtime") && cfg!(feature = "build-from-source") {
+        build.define("MNN_RUNTIME_ENABLED", None);
+        println!("cargo:rustc-cfg=feature=\"runtime\"");
+    } else if cfg!(feature = "runtime") {
+        // Warn if runtime feature is used with prebuilt binaries
+        println!("cargo:warning=mnn-sys: 'runtime' feature requires MNN with RuntimeManager. Skipping - use --features build-from-source to enable.");
+    }
+
+    // Compile module wrapper if feature enabled
+    // Note: This requires MNN with training module, only available when building from source
+    let module_wrapper_cpp = wrapper_dir.join("mnn_module_wrapper.cpp");
+    if cfg!(feature = "module") && cfg!(feature = "build-from-source") && module_wrapper_cpp.exists() {
+        build.file(&module_wrapper_cpp);
+    }
+
     // Configure Android NDK compiler for cross-compilation
     if target_os == "android" {
         let ndk_home = env::var("ANDROID_NDK_HOME")
@@ -358,8 +388,8 @@ fn main() {
         // Android API level - must match what MNN was built with
         let api_level = 24;
 
-        // Determine toolchain path and prefix based on target
-        let (tool_prefix, target_triple) = match &target_arch[..] {
+        // Determine toolchain prefix and target triple based on target
+        let (_tool_prefix, target_triple) = match &target_arch[..] {
             "aarch64" => ("aarch64-linux-android", "aarch64-linux-android"),
             "armv7" | "arm" => ("arm-linux-androideabi", "armv7-linux-androideabi"),
             "x86_64" => ("x86_64-linux-android", "x86_64-linux-android"),
@@ -421,8 +451,8 @@ fn main() {
     // Set C++ standard and compiler flags based on TARGET (not host)
     if target_env == "msvc" {
         build.flag("/std:c++14");
-        // Match runtime library with MNN's build (always /MT for static builds)
-        // MNN is always built with Release configuration, so use /MT
+        // Prebuilt MNN binaries are built with /MT (static runtime)
+        // When building from source, we also use /MT for consistency
         build.flag("/MT");
     } else {
         build.flag_if_supported("-std=c++14");

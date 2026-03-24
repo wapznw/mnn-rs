@@ -50,6 +50,14 @@ system-mnn = []
 # Generate bindings using bindgen
 generate-bindings = ["bindgen"]
 
+# Extended API features
+# Image processing support (requires MNN with CV module)
+image-process = []
+# Dynamic computation graph support (requires MNN with Expr/Module)
+module = []
+# Multi-session runtime sharing (requires MNN with RuntimeManager)
+runtime = []
+
 # Platform specific
 android = []
 ios = []

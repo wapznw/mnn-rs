@@ -10,6 +10,10 @@
 #include <MNN/MNNForwardType.h>
 #include <MNN/ImageProcess.hpp>
 #include <MNN/Matrix.h>
+#ifdef MNN_MODULE_ENABLED
+#include <MNN/expr/Expr.hpp>
+#include <MNN/expr/Executor.hpp>
+#endif
 #include <cstring>
 #include <stdio.h>
 
@@ -243,6 +247,8 @@ int mnn_tensor_get_dimension_type(const MNNTensor* tensor) {
  * ImageProcess Functions
  * ============================================================================ */
 
+#ifdef MNN_IMAGE_PROCESS
+
 MNNImageProcess* mnn_image_process_create(const MNNImageProcessConfig* config) {
     if (!config) {
         return nullptr;
@@ -307,6 +313,8 @@ void mnn_image_tensor_destroy(MNNTensor* tensor) {
         delete reinterpret_cast<MNN::Tensor*>(tensor);
     }
 }
+
+#endif /* MNN_IMAGE_PROCESS */
 
 /* ============================================================================
  * Matrix Functions
@@ -634,20 +642,18 @@ int mnn_interpreter_get_session_op_count(MNNInterpreter* interpreter, MNNSession
 
 /* ============================================================================
  * Runtime Management (Multi-Session Sharing)
+ * Note: Requires MNN with full Express/Module support
  * ============================================================================ */
 
 MNNRuntimeManager* mnn_runtime_manager_create(int type, int num_threads) {
 #ifdef MNN_RUNTIME_ENABLED
-    if (type < 0 || type > MNN_FORWARD_NPU) {
-        return nullptr;
-    }
-
     // Create schedule config
     ScheduleConfig config;
     config.type = static_cast<MNNForwardType>(type);
     config.numThread = num_threads > 0 ? num_threads : 4;
 
     // Create runtime manager using MNN's Executor
+    // Note: Requires MNN with Express::Executor support
     auto* rtmgr = MNN::Express::Executor::RuntimeManager::createRuntimeManager(config);
     return reinterpret_cast<MNNRuntimeManager*>(rtmgr);
 #else
@@ -690,7 +696,7 @@ MNNSession* mnn_interpreter_create_session_with_runtime(
     config.numThread = num_threads > 0 ? num_threads : 4;
 
     // Create session with runtime manager
-    // Note: This requires MNN's internal API support
+    // Note: This requires MNN with RuntimeManager support
     Session* session = interp->createSession(config, rtmgr);
     return reinterpret_cast<MNNSession*>(session);
 #else

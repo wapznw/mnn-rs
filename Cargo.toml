@@ -74,6 +74,14 @@ build-from-source = ["mnn-rs-sys/build-from-source"]
 # Use system-installed MNN
 system-mnn = ["mnn-rs-sys/system-mnn"]
 
+# Extended API features
+# Image processing support (requires MNN with CV module)
+image-process = ["mnn-rs-sys/image-process"]
+# Dynamic computation graph support (requires MNN with Expr/Module)
+module = ["mnn-rs-sys/module"]
+# Multi-session runtime sharing (requires MNN with RuntimeManager)
+runtime = ["mnn-rs-sys/runtime"]
+
 # Platform specific (usually auto-detected)
 android = ["mnn-rs-sys/android"]
 ios = ["mnn-rs-sys/ios"]
