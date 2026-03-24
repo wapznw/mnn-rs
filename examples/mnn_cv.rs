@@ -41,6 +41,11 @@ fn main() -> Result<(), mnn_rs::MnnError> {
     println!("  Dtype: {}", img.dtype());
     println!("  Element count: {}", img.element_count());
 
+    // Try reading as u8 (imread returns uint8 tensor)
+    let data: Vec<u8> = img.read()?;
+    println!("  Read {} bytes", data.len());
+    println!("  First 10 bytes: {:?}", &data[0..10.min(data.len())]);
+
     // Calculate dimensions from tensor shape
     // For NHWC: [height, width, channels] or [1, height, width, channels]
     let height = if shape.len() >= 4 { shape[1] } else { shape[0] };

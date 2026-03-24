@@ -49,9 +49,12 @@
 
 use std::env;
 use std::fs;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
+
+#[cfg(feature = "build-from-source")]
+use std::hash::{Hash, Hasher};
+#[cfg(feature = "build-from-source")]
 use std::collections::hash_map::DefaultHasher;
 
 /// MNN version for prebuilt binaries - automatically reads from Cargo.toml
@@ -870,6 +873,12 @@ fn build_mnn_from_source(
         cmake_args.push("-DMNN_METAL=ON".to_string());
     }
 
+    // ImageProcess and CV module options (enabled with image-process feature)
+    if cfg!(feature = "image-process") {
+        cmake_args.push("-DMNN_BUILD_OPENCV=ON".to_string());
+        cmake_args.push("-DMNN_IMGCODECS=ON".to_string());
+    }
+
     // Precision options
     if cfg!(feature = "fp16") {
         cmake_args.push("-DMNN_SUPPORT_FP16=ON".to_string());
@@ -1063,6 +1072,29 @@ fn build_mnn_from_source(
         }
     }
 
+    // Copy CV headers if image-process feature is enabled
+    // MNN CMake doesn't install CV headers by default
+    if cfg!(feature = "image-process") {
+        let cv_include_dest = install_dir.join("include").join("MNN").join("cv");
+        let cv_include_src = source_path.join("tools").join("cv").join("include").join("cv");
+
+        if cv_include_src.exists() {
+            if debug {
+                println!("cargo:warning=mnn-sys: Copying CV headers from {:?}", cv_include_src);
+            }
+
+            // Create destination directory
+            std::fs::create_dir_all(&cv_include_dest).ok();
+
+            // Copy header files recursively
+            if let Err(e) = copy_dir_all(&cv_include_src, &cv_include_dest) {
+                if debug {
+                    println!("cargo:warning=mnn-sys: Failed to copy CV headers: {}", e);
+                }
+            }
+        }
+    }
+
     // Check if install directory was created
     let installed_lib = install_dir.join("lib").join(if target_os == "windows" {
         if target_env == "gnu" { "libMNN.a" } else { "mnn.lib" }
@@ -1117,6 +1149,24 @@ fn build_mnn_from_source(
     }
 
     (lib_dir, include_dir)
+}
+
+/// Copy a directory recursively
+#[cfg(feature = "build-from-source")]
+fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
 }
 
 /// Build from source stub when cmake feature is not enabled

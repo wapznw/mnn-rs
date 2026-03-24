@@ -10,12 +10,19 @@
 #include <MNN/MNNForwardType.h>
 #include <MNN/ImageProcess.hpp>
 #include <MNN/Matrix.h>
+#ifdef MNN_IMGCODECS
+#include <MNN/cv/imgcodecs.hpp>
+#endif
+#ifdef MNN_BUILD_OPENCV
+#include <MNN/cv/imgproc/geometric.hpp>
+#endif
 #ifdef MNN_MODULE_ENABLED
 #include <MNN/expr/Expr.hpp>
 #include <MNN/expr/Executor.hpp>
 #endif
 #include <cstring>
-#include <stdio.h>
+#include <cstdio>
+#include <memory>
 
 using namespace MNN;
 
@@ -325,15 +332,40 @@ MNNTensor* mnn_imread(const char* path, int flags) {
         return nullptr;
     }
 
-    auto varp = MNN::CV::imread(path, flags);
+    auto varp = MNN::CV::imread(std::string(path), flags);
     if (varp == nullptr) {
         return nullptr;
     }
 
-    // Get tensor from VARP
+    // Compute the VARP to get actual data
+    MNN::Express::Variable::compute({varp});
+
+    // Get tensor from VARP after computation
     auto tensor = varp->getTensor();
-    // Return as raw tensor (caller takes ownership)
-    return reinterpret_cast<MNNTensor*>(tensor);
+    if (!tensor) {
+        return nullptr;
+    }
+
+    // Get tensor info
+    auto type = tensor->getType();
+    auto dims = tensor->shape();
+
+    // Create a new tensor with the same shape and type
+    auto owned_tensor = MNN::Tensor::create(dims, type, nullptr, MNN::Tensor::DimensionType::TENSORFLOW);
+    if (!owned_tensor) {
+        return nullptr;
+    }
+
+    // Copy data
+    auto srcHost = tensor->host<uint8_t>();
+    auto dstHost = owned_tensor->host<uint8_t>();
+    if (srcHost && dstHost) {
+        auto bytes = owned_tensor->size();
+        memcpy(dstHost, srcHost, bytes);
+    }
+
+    // Return the owned tensor (caller must destroy it using mnn_tensor_destroy)
+    return reinterpret_cast<MNNTensor*>(owned_tensor);
 #else
     (void)path;
     (void)flags;
@@ -349,10 +381,14 @@ int mnn_imwrite(const char* path, const MNNTensor* tensor, const void* params) {
 
     auto t = reinterpret_cast<const MNN::Tensor*>(tensor);
 
-    // Create VARP from tensor
-    auto varp = MNN::Express::VARP::create(t);
+    // Create VARP from tensor: use Expr::create() and Variable::create()
+    // const_cast is safe here as we don't modify the tensor and don't take ownership
+    auto expr = MNN::Express::Expr::create(const_cast<MNN::Tensor*>(t), false);
+    auto varp = MNN::Express::Variable::create(expr, 0);
 
-    bool result = MNN::CV::imwrite(path, varp, params);
+    // Convert params to std::vector<int> (not currently used from Rust)
+    std::vector<int> empty_params;
+    bool result = MNN::CV::imwrite(std::string(path), varp, empty_params);
     return result ? 0 : -1;
 #else
     (void)path;
@@ -371,23 +407,55 @@ MNNTensor* mnn_resize(const MNNTensor* src, int dstWidth, int dstHeight, int fil
     auto srcTensor = reinterpret_cast<const MNN::Tensor*>(src);
 
     // Filter: 0=nearest, 1=bilinear, 2=bicubic
-    MNN::CV::InterpolationMethod method = MNN::CV::INTER_LINEAR;
+    int method = MNN::CV::INTER_LINEAR;
     if (filter == 0) {
         method = MNN::CV::INTER_NEAREST;
     } else if (filter == 2) {
         method = MNN::CV::INTER_CUBIC;
     }
 
-    auto varp = MNN::Express::VARP::create(srcTensor);
-    auto resized = MNN::CV::resize(varp, dstWidth, dstHeight, method);
+    // Create VARP from tensor: use Expr::create() and Variable::create()
+    // const_cast is safe here as we don't modify the tensor and don't take ownership
+    auto expr = MNN::Express::Expr::create(const_cast<MNN::Tensor*>(srcTensor), false);
+    auto varp = MNN::Express::Variable::create(expr, 0);
+
+    // MNN::CV::resize signature: resize(VARP src, Size dsize, double fx, double fy, int interpolation, ...)
+    MNN::CV::Size dsize = {dstWidth, dstHeight};
+    auto resized = MNN::CV::resize(varp, dsize, 0, 0, method);
 
     if (resized == nullptr) {
         return nullptr;
     }
 
-    // Note: This returns the internal tensor, not a clone
-    // Caller should not free this tensor directly
-    return reinterpret_cast<MNNTensor*>(resized->getTensor());
+    // Compute the VARP to get actual data
+    MNN::Express::Variable::compute({resized});
+
+    // Get tensor from VARP after computation
+    auto tensor = resized->getTensor();
+    if (!tensor) {
+        return nullptr;
+    }
+
+    // Get tensor info
+    auto type = tensor->getType();
+    auto dims = tensor->shape();
+
+    // Create a new tensor with the same shape and type
+    auto owned_tensor = MNN::Tensor::create(dims, type, nullptr, MNN::Tensor::DimensionType::TENSORFLOW);
+    if (!owned_tensor) {
+        return nullptr;
+    }
+
+    // Copy data
+    auto srcHost = tensor->host<uint8_t>();
+    auto dstHost = owned_tensor->host<uint8_t>();
+    if (srcHost && dstHost) {
+        auto bytes = owned_tensor->size();
+        memcpy(dstHost, srcHost, bytes);
+    }
+
+    // Return the owned tensor (caller must destroy it using mnn_tensor_destroy)
+    return reinterpret_cast<MNNTensor*>(owned_tensor);
 #else
     (void)src;
     (void)dstWidth;

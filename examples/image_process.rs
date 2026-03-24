@@ -35,7 +35,7 @@ fn main() -> Result<(), mnn_rs::MnnError> {
     // Check if input path is provided and exists
     let use_test_image = input_path.is_empty() || !Path::new(&input_path).exists();
 
-    if use_test_image {
+    let result = if use_test_image {
         println!("[Step 1] Using generated test pattern");
         println!("  Note: Provide an image path to use imread:");
         println!("  cargo run --example image_process -- input.jpg output.png\n");
@@ -93,6 +93,8 @@ fn main() -> Result<(), mnn_rs::MnnError> {
             }
         }
     };
+
+    result?;
 
     println!("\n=== Processing completed! ===");
     Ok(())

@@ -118,7 +118,10 @@ impl Tensor {
 
     /// Get the data type of the tensor.
     pub fn dtype(&self) -> DataType {
-        DataType::Float32 // Default for now
+        unsafe {
+            let type_code = mnn_rs_sys::mnn_tensor_get_type_code(self.inner);
+            DataType::from_type_code(type_code)
+        }
     }
 
     /// Get the data format of the tensor.
@@ -473,6 +476,13 @@ impl<'a> TensorView<'a> {
     /// Get the data type.
     pub fn dtype(&self) -> DataType {
         DataType::Float32
+    }
+}
+
+impl TensorInfo {
+    /// Get the data type.
+    pub fn dtype(&self) -> DataType {
+        self.dtype
     }
 }
 

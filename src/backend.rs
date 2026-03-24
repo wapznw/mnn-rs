@@ -367,6 +367,28 @@ impl DataType {
             DataType::BFloat16 => (0 << 8) | 16,
         }
     }
+
+    /// Create from MNN type code.
+    pub(crate) fn from_type_code(code: i32) -> Self {
+        // MNN halide_type_t codes: (type << 8) | bits
+        let type_code = (code >> 8) & 0xFF;
+        let bits = code & 0xFF;
+
+        match (type_code, bits) {
+            (0, 32) => DataType::Float32,
+            (0, 64) => DataType::Float64,
+            (1, 32) => DataType::Int32,
+            (1, 16) => DataType::Int16,
+            #[cfg(feature = "int8")]
+            (1, 8) => DataType::Int8,
+            (2, 8) => DataType::UInt8,
+            #[cfg(feature = "fp16")]
+            (0, 16) => DataType::Float16,
+            #[cfg(feature = "bf16")]
+            (0, 16) => DataType::BFloat16,
+            _ => DataType::Float32, // Default fallback
+        }
+    }
 }
 
 impl std::fmt::Display for DataType {
