@@ -351,6 +351,12 @@ fn main() {
     // Note: image-process requires MNN with CV module (included in prebuilt binaries)
     if cfg!(feature = "image-process") {
         build.define("MNN_IMAGE_PROCESS", None);
+        // MNN_IMGCODECS and MNN_BUILD_OPENCV require building MNN from source
+        // Prebuilt binaries have basic ImageProcess support but not imread/imwrite
+        if cfg!(feature = "build-from-source") {
+            build.define("MNN_BUILD_OPENCV", "ON");
+            build.define("MNN_IMGCODECS", "ON");
+        }
         println!("cargo:rustc-cfg=feature=\"image-process\"");
     }
     // Note: module feature requires MNN with training module (Express/Module)

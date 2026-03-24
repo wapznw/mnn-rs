@@ -271,6 +271,15 @@ extern "C" {
     /// Destroy image tensor
     pub fn mnn_image_tensor_destroy(tensor: *mut MNNTensor);
 
+    /// Read image from file using MNN CV (requires MNN_IMGCODECS)
+    pub fn mnn_imread(path: *const c_char, flags: c_int) -> *mut MNNTensor;
+
+    /// Write image to file using MNN CV (requires MNN_IMGCODECS)
+    pub fn mnn_imwrite(path: *const c_char, tensor: *const MNNTensor, params: *const c_void) -> c_int;
+
+    /// Resize image tensor (requires MNN_BUILD_OPENCV)
+    pub fn mnn_resize(src: *const MNNTensor, dstWidth: c_int, dstHeight: c_int, filter: c_int) -> *mut MNNTensor;
+
     // ========================================================================
     // Matrix Functions
     // ========================================================================

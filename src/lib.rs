@@ -103,7 +103,8 @@ pub use tensor::{Tensor, TensorData, TensorInfo, TensorView};
 mod image_process;
 #[cfg(feature = "image-process")]
 pub use image_process::{
-    Filter, ImageConfig, ImageFormat, ImageProcess, Matrix, Wrap,
+    imread, imwrite, resize,
+    Filter, ImageConfig, ImageFormat, ImageProcess, ImreadFlags, Matrix, ResizeFilter, Wrap,
 };
 
 mod session;

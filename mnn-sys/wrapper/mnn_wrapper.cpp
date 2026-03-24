@@ -314,6 +314,89 @@ void mnn_image_tensor_destroy(MNNTensor* tensor) {
     }
 }
 
+/* ============================================================================
+ * MNN CV Image Codecs (imread/imwrite/resize)
+ * Requires: -DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON
+ * ============================================================================ */
+
+MNNTensor* mnn_imread(const char* path, int flags) {
+#ifdef MNN_IMGCODECS
+    if (!path) {
+        return nullptr;
+    }
+
+    auto varp = MNN::CV::imread(path, flags);
+    if (varp == nullptr) {
+        return nullptr;
+    }
+
+    // Get tensor from VARP
+    auto tensor = varp->getTensor();
+    // Return as raw tensor (caller takes ownership)
+    return reinterpret_cast<MNNTensor*>(tensor);
+#else
+    (void)path;
+    (void)flags;
+    return nullptr;
+#endif
+}
+
+int mnn_imwrite(const char* path, const MNNTensor* tensor, const void* params) {
+#ifdef MNN_IMGCODECS
+    if (!path || !tensor) {
+        return -1;
+    }
+
+    auto t = reinterpret_cast<const MNN::Tensor*>(tensor);
+
+    // Create VARP from tensor
+    auto varp = MNN::Express::VARP::create(t);
+
+    bool result = MNN::CV::imwrite(path, varp, params);
+    return result ? 0 : -1;
+#else
+    (void)path;
+    (void)tensor;
+    (void)params;
+    return -1;
+#endif
+}
+
+MNNTensor* mnn_resize(const MNNTensor* src, int dstWidth, int dstHeight, int filter) {
+#ifdef MNN_BUILD_OPENCV
+    if (!src || dstWidth <= 0 || dstHeight <= 0) {
+        return nullptr;
+    }
+
+    auto srcTensor = reinterpret_cast<const MNN::Tensor*>(src);
+
+    // Filter: 0=nearest, 1=bilinear, 2=bicubic
+    MNN::CV::InterpolationMethod method = MNN::CV::INTER_LINEAR;
+    if (filter == 0) {
+        method = MNN::CV::INTER_NEAREST;
+    } else if (filter == 2) {
+        method = MNN::CV::INTER_CUBIC;
+    }
+
+    auto varp = MNN::Express::VARP::create(srcTensor);
+    auto resized = MNN::CV::resize(varp, dstWidth, dstHeight, method);
+
+    if (resized == nullptr) {
+        return nullptr;
+    }
+
+    // Note: This returns the internal tensor, not a clone
+    // Caller should not free this tensor directly
+    return reinterpret_cast<MNNTensor*>(resized->getTensor());
+#else
+    (void)src;
+    (void)dstWidth;
+    (void)dstHeight;
+    (void)filter;
+    return nullptr;
+#endif
+}
+
 #endif /* MNN_IMAGE_PROCESS */
 
 /* ============================================================================

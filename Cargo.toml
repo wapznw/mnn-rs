@@ -118,3 +118,7 @@ required-features = ["cuda"]
 [[example]]
 name = "image_process"
 required-features = ["image-process"]
+
+[[example]]
+name = "mnn_cv"
+required-features = ["image-process"]

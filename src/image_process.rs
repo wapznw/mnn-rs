@@ -529,6 +529,134 @@ impl ImageProcess {
     }
 }
 
+/// Image read flags (same as OpenCV imread flags)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImreadFlags {
+    /// Read image as-is (preserve original format)
+    Unchanged = -1,
+    /// Convert to grayscale
+    Grayscale = 0,
+    /// Convert to color (BGR)
+    Color = 1,
+}
+
+/// Resize filter types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ResizeFilter {
+    /// Nearest neighbor interpolation
+    Nearest,
+    /// Bilinear interpolation
+    #[default]
+    Bilinear,
+    /// Bicubic interpolation
+    Bicubic,
+}
+
+/// Read an image from file using MNN CV.
+///
+/// Requires MNN built with `-DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON`.
+///
+/// # Arguments
+/// * `path` - Path to the image file (JPG, PNG, etc.)
+/// * `flags` - Read flags (grayscale, color, unchanged)
+///
+/// # Returns
+/// A tensor containing the image data (uint8 type) on success, or an error on failure.
+///
+/// # Example
+/// ```no_run
+/// use mnn_rs::imread;
+///
+/// // Read as color image (BGR)
+/// let tensor = imread("image.jpg", mnn_rs::ImreadFlags::Color)?;
+/// # Ok::<(), mnn_rs::MnnError>(())
+/// ```
+pub fn imread<P: AsRef<std::path::Path>>(path: P, flags: ImreadFlags) -> MnnResult<Tensor> {
+    let path_cstr = std::ffi::CString::new(
+        path.as_ref().to_str().ok_or(MnnError::InvalidPath)?
+    ).map_err(|_| MnnError::InvalidPath)?;
+
+    let inner = unsafe { mnn_imread(path_cstr.as_ptr(), flags as i32) };
+
+    if inner.is_null() {
+        return Err(MnnError::internal("Failed to read image (MNN imread returned null)"));
+    }
+
+    Ok(unsafe { Tensor::from_ptr(inner, None) })
+}
+
+/// Write an image to file using MNN CV.
+///
+/// Requires MNN built with `-DMNN_BUILD_OPENCV=ON -DMNN_IMGCODECS=ON`.
+///
+/// # Arguments
+/// * `path` - Output file path
+/// * `tensor` - Image tensor (uint8 type)
+///
+/// # Returns
+/// Ok(()) on success, or an error on failure.
+///
+/// # Example
+/// ```no_run
+/// use mnn_rs::{imread, imwrite, ImreadFlags};
+///
+/// let img = imread("input.jpg", ImreadFlags::Color)?;
+/// imwrite("output.png", &img)?;
+/// # Ok::<(), mnn_rs::MnnError>(())
+/// ```
+pub fn imwrite<P: AsRef<std::path::Path>>(path: P, tensor: &Tensor) -> MnnResult<()> {
+    let path_cstr = std::ffi::CString::new(
+        path.as_ref().to_str().ok_or(MnnError::InvalidPath)?
+    ).map_err(|_| MnnError::InvalidPath)?;
+
+    let result = unsafe { mnn_imwrite(path_cstr.as_ptr(), tensor.as_ptr(), std::ptr::null()) };
+
+    if result != 0 {
+        return Err(MnnError::internal(format!("MNN imwrite failed with error code: {}", result)));
+    }
+
+    Ok(())
+}
+
+/// Resize an image tensor.
+///
+/// Requires MNN built with `-DMNN_BUILD_OPENCV=ON`.
+///
+/// # Arguments
+/// * `src` - Source image tensor
+/// * `dst_width` - Destination width
+/// * `dst_height` - Destination height
+/// * `filter` - Interpolation filter
+///
+/// # Returns
+/// A new resized tensor on success, or an error on failure.
+///
+/// # Example
+/// ```no_run
+/// use mnn_rs::{imread, resize, ResizeFilter, ImreadFlags};
+///
+/// let img = imread("image.jpg", ImreadFlags::Color)?;
+/// let resized = resize(&img, 224, 224, ResizeFilter::Bilinear)?;
+/// # Ok::<(), mnn_rs::MnnError>(())
+/// ```
+pub fn resize(src: &Tensor, dst_width: i32, dst_height: i32, filter: ResizeFilter) -> MnnResult<Tensor> {
+    let filter_code = match filter {
+        ResizeFilter::Nearest => 0,
+        ResizeFilter::Bilinear => 1,
+        ResizeFilter::Bicubic => 2,
+    };
+
+    let inner = unsafe { mnn_resize(src.as_ptr(), dst_width, dst_height, filter_code) };
+
+    if inner.is_null() {
+        return Err(MnnError::internal("Failed to resize image (MNN resize returned null)"));
+    }
+
+    // Note: mnn_resize returns a tensor from VARP's getTensor()
+    // We need to clone it to get an owned tensor
+    Ok(unsafe { Tensor::from_ptr(inner, None) })
+}
+
 impl Drop for ImageProcess {
     fn drop(&mut self) {
         if !self.inner.is_null() {

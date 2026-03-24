@@ -202,6 +202,38 @@ MNNTensor* mnn_image_tensor_create(int w, int h, int bpp, void* data);
 /** Destroy image tensor */
 void mnn_image_tensor_destroy(MNNTensor* tensor);
 
+/**
+ * @brief Read image from file using MNN CV
+ * @param path Image file path
+ * @param flags Read flags (same as OpenCV imread flags)
+ * @return created tensor (uint8 type), NULL on failure
+ *
+ * Flags:
+ *   -1 = Unchanged
+ *    0 = Grayscale
+ *    1 = Color (BGR)
+ */
+MNNTensor* mnn_imread(const char* path, int flags);
+
+/**
+ * @brief Write image to file using MNN CV
+ * @param path Output file path
+ * @param tensor Input tensor (uint8 type)
+ * @param params Optional parameters (not used currently)
+ * @return 0 on success, error code on failure
+ */
+int mnn_imwrite(const char* path, const MNNTensor* tensor, const void* params);
+
+/**
+ * @brief Resize image tensor
+ * @param src Source tensor
+ * @param dstWidth Destination width
+ * @param dstHeight Destination height
+ * @param filter Filter type (0=nearest, 1=bilinear, 2=bicubic)
+ * @return New resized tensor, NULL on failure
+ */
+MNNTensor* mnn_resize(const MNNTensor* src, int dstWidth, int dstHeight, int filter);
+
 /* ============================================================================
  * Matrix Functions
  * ============================================================================ */

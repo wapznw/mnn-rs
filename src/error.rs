@@ -41,6 +41,10 @@ pub enum MnnError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    /// Invalid path (non-UTF8 or invalid format)
+    #[error("Invalid path")]
+    InvalidPath,
+
     /// Internal MNN error
     #[error("Internal error: {0}")]
     Internal(String),
