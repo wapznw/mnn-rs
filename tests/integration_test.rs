@@ -8,8 +8,8 @@ use mnn_rs::prelude::*;
 /// Check if a test model is available
 fn test_model_available() -> Option<&'static str> {
     // Check for test model in common locations
-    if std::path::Path::new("tests/models/test.mnn").exists() {
-        Some("tests/models/test.mnn")
+    if std::path::Path::new("tests/models/mobilenetV3.mnn").exists() {
+        Some("tests/models/mobilenetV3.mnn")
     } else if std::path::Path::new("test.mnn").exists() {
         Some("test.mnn")
     } else {

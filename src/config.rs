@@ -30,9 +30,18 @@ impl DataFormat {
             DataFormat::Nc4hw4 => "NC4HW4",
         }
     }
+
+    /// Convert to MNN dimension type constant.
+    pub(crate) fn to_mnn(&self) -> i32 {
+        match self {
+            DataFormat::Nhwc => mnn_rs_sys::MNN_DATA_FORMAT_NHWC,
+            DataFormat::Nchw => mnn_rs_sys::MNN_DATA_FORMAT_NCHW,
+            DataFormat::Nc4hw4 => mnn_rs_sys::MNN_DATA_FORMAT_NC4HW4,
+        }
+    }
 }
 
-/// Memory usage mode.
+/// Power usage mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum MemoryMode {
     /// Normal memory usage (balanced)
@@ -44,6 +53,50 @@ pub enum MemoryMode {
 
     /// High memory usage for better performance
     High,
+}
+
+/// Session mode for controlling interpreter behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum SessionMode {
+    /// Debug mode - allows callback and internal op info
+    #[default]
+    Debug,
+    /// Release mode - no callback, optimized
+    Release,
+    /// Input tensor allocated by session
+    InputInside,
+    /// Input tensor allocated by user
+    InputUser,
+    /// Output tensor depends on session
+    OutputInside,
+    /// Output tensor can be used separately
+    OutputUser,
+    /// Resize session directly
+    ResizeDirect,
+    /// Resize session deferred
+    ResizeDefer,
+    /// Backend fixed by user setting
+    BackendFix,
+    /// Backend auto determined by MNN
+    BackendAuto,
+}
+
+impl SessionMode {
+    /// Convert to MNN constant.
+    pub(crate) fn to_mnn(self) -> i32 {
+        match self {
+            SessionMode::Debug => mnn_rs_sys::MNN_SESSION_MODE_DEBUG,
+            SessionMode::Release => mnn_rs_sys::MNN_SESSION_MODE_RELEASE,
+            SessionMode::InputInside => mnn_rs_sys::MNN_SESSION_MODE_INPUT_INSIDE,
+            SessionMode::InputUser => mnn_rs_sys::MNN_SESSION_MODE_INPUT_USER,
+            SessionMode::OutputInside => mnn_rs_sys::MNN_SESSION_MODE_OUTPUT_INSIDE,
+            SessionMode::OutputUser => mnn_rs_sys::MNN_SESSION_MODE_OUTPUT_USER,
+            SessionMode::ResizeDirect => mnn_rs_sys::MNN_SESSION_MODE_RESIZE_DIRECT,
+            SessionMode::ResizeDefer => mnn_rs_sys::MNN_SESSION_MODE_RESIZE_DEFER,
+            SessionMode::BackendFix => mnn_rs_sys::MNN_SESSION_MODE_BACKEND_FIX,
+            SessionMode::BackendAuto => mnn_rs_sys::MNN_SESSION_MODE_BACKEND_AUTO,
+        }
+    }
 }
 
 /// Power usage mode.

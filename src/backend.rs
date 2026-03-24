@@ -47,6 +47,21 @@ impl BackendType {
         }
     }
 
+    /// Convert from MNN forward type constant.
+    pub(crate) fn from_mnn_type(code: i32) -> Self {
+        match code {
+            #[cfg(feature = "cuda")]
+            x if x == mnn_rs_sys::MNN_FORWARD_CUDA => BackendType::Cuda,
+            #[cfg(feature = "opencl")]
+            x if x == mnn_rs_sys::MNN_FORWARD_OPENCL => BackendType::OpenCL,
+            #[cfg(feature = "vulkan")]
+            x if x == mnn_rs_sys::MNN_FORWARD_VULKAN => BackendType::Vulkan,
+            #[cfg(feature = "metal")]
+            x if x == mnn_rs_sys::MNN_FORWARD_METAL => BackendType::Metal,
+            _ => BackendType::CPU,
+        }
+    }
+
     /// Get the name of this backend.
     pub fn name(&self) -> &'static str {
         match self {
@@ -333,6 +348,24 @@ impl DataType {
     /// Check if this is a signed type.
     pub fn is_signed(&self) -> bool {
         !matches!(self, DataType::UInt8)
+    }
+
+    /// Convert to MNN type code.
+    pub(crate) fn to_type_code(&self) -> i32 {
+        // MNN uses halide_type_t codes: (code << 8) | bits
+        match self {
+            DataType::Float32 => (0 << 8) | 32,  // halide_type_float = 0
+            DataType::Float64 => (0 << 8) | 64,
+            DataType::Int32 => (1 << 8) | 32,    // halide_type_int = 1
+            DataType::Int16 => (1 << 8) | 16,
+            #[cfg(feature = "int8")]
+            DataType::Int8 => (1 << 8) | 8,
+            DataType::UInt8 => (2 << 8) | 8,     // halide_type_uint = 2
+            #[cfg(feature = "fp16")]
+            DataType::Float16 => (0 << 8) | 16,
+            #[cfg(feature = "bf16")]
+            DataType::BFloat16 => (0 << 8) | 16,
+        }
     }
 }
 

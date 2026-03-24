@@ -4,10 +4,13 @@
 //! It's the primary entry point for running neural network inference with MNN.
 
 use crate::config::ScheduleConfig;
+use crate::config::SessionMode;
 use crate::error::{MnnError, MnnResult};
 use crate::session::Session;
+use crate::tensor::Tensor;
 use mnn_rs_sys::MNNInterpreter;
 use std::ffi::CString;
+use std::ffi::CStr;
 use std::path::Path;
 
 /// A model interpreter that holds a loaded neural network model.
@@ -184,6 +187,181 @@ impl Interpreter {
             std::ffi::CStr::from_ptr(ptr)
                 .to_string_lossy()
                 .into_owned()
+        }
+    }
+
+    /// Get the raw pointer to the underlying MNN Interpreter.
+    ///
+    /// # Safety
+    /// The returned pointer is owned by this Interpreter and must not be freed.
+    pub fn inner(&self) -> *mut mnn_rs_sys::MNNInterpreter {
+        self.inner
+    }
+
+    // ========================================================================
+    // Session Advanced Features
+    // ========================================================================
+
+    /// Set session mode.
+    ///
+    /// # Arguments
+    /// * `mode` - The session mode to set
+    pub fn set_session_mode(&self, mode: SessionMode) {
+        unsafe {
+            mnn_rs_sys::mnn_interpreter_set_session_mode(self.inner, mode.to_mnn());
+        }
+    }
+
+    /// Set cache file for optimization.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the cache file
+    /// * `key_size` - Key size for cache lookup (default: 128)
+    pub fn set_cache_file<P: AsRef<Path>>(&self, path: P, key_size: usize) {
+        let path_str = path.as_ref().to_string_lossy();
+        if let Ok(c_path) = CString::new(path_str.as_ref()) {
+            unsafe {
+                mnn_rs_sys::mnn_interpreter_set_cache_file(self.inner, c_path.as_ptr(), key_size);
+            }
+        }
+    }
+
+    /// Update cache from a session.
+    ///
+    /// # Arguments
+    /// * `session` - The session to update cache from
+    ///
+    /// # Returns
+    /// Ok(()) on success, or an error on failure.
+    pub fn update_cache(&self, session: &Session) -> MnnResult<()> {
+        let result = unsafe {
+            mnn_rs_sys::mnn_interpreter_update_cache(self.inner, session.inner())
+        };
+
+        if result != mnn_rs_sys::MNN_ERROR_NONE as i32 {
+            return Err(MnnError::internal("Failed to update cache"));
+        }
+
+        Ok(())
+    }
+
+    /// Set external file for model.
+    ///
+    /// # Arguments
+    /// * `path` - Path to the external file
+    /// * `flag` - Flag for external file processing
+    pub fn set_external_file<P: AsRef<Path>>(&self, path: P, flag: usize) {
+        let path_str = path.as_ref().to_string_lossy();
+        if let Ok(c_path) = CString::new(path_str.as_ref()) {
+            unsafe {
+                mnn_rs_sys::mnn_interpreter_set_external_file(self.inner, c_path.as_ptr(), flag);
+            }
+        }
+    }
+
+    /// Get input tensor names for a session.
+    ///
+    /// # Arguments
+    /// * `session` - The session to get input names from
+    ///
+    /// # Returns
+    /// A vector of input tensor names.
+    pub fn get_input_names(&self, session: &Session) -> Vec<String> {
+        unsafe {
+            let array = mnn_rs_sys::mnn_interpreter_get_input_names(self.inner, session.inner());
+            let mut names = Vec::with_capacity(array.count as usize);
+
+            for i in 0..array.count {
+                let name_ptr = *array.names.offset(i as isize);
+                if !name_ptr.is_null() {
+                    let name = CStr::from_ptr(name_ptr).to_string_lossy().into_owned();
+                    names.push(name);
+                }
+            }
+
+            mnn_rs_sys::mnn_string_array_free(&mut std::ptr::read(&array) as *mut _);
+            names
+        }
+    }
+
+    /// Get output tensor names for a session.
+    ///
+    /// # Arguments
+    /// * `session` - The session to get output names from
+    ///
+    /// # Returns
+    /// A vector of output tensor names.
+    pub fn get_output_names(&self, session: &Session) -> Vec<String> {
+        unsafe {
+            let array = mnn_rs_sys::mnn_interpreter_get_output_names(self.inner, session.inner());
+            let mut names = Vec::with_capacity(array.count as usize);
+
+            for i in 0..array.count {
+                let name_ptr = *array.names.offset(i as isize);
+                if !name_ptr.is_null() {
+                    let name = CStr::from_ptr(name_ptr).to_string_lossy().into_owned();
+                    names.push(name);
+                }
+            }
+
+            mnn_rs_sys::mnn_string_array_free(&mut std::ptr::read(&array) as *mut _);
+            names
+        }
+    }
+
+    /// Resize a tensor with new shape.
+    ///
+    /// # Arguments
+    /// * `tensor` - The tensor to resize
+    /// * `shape` - New shape
+    pub fn resize_tensor(&self, tensor: &mut Tensor, shape: &[i32]) {
+        if shape.is_empty() {
+            return;
+        }
+
+        unsafe {
+            mnn_rs_sys::mnn_interpreter_resize_tensor(
+                self.inner,
+                tensor.inner_mut(),
+                shape.as_ptr(),
+                shape.len() as i32,
+            );
+        }
+    }
+
+    /// Resize a session after tensor resizing.
+    ///
+    /// # Arguments
+    /// * `session` - The session to resize
+    pub fn resize_session(&self, session: &mut Session) {
+        unsafe {
+            mnn_rs_sys::mnn_interpreter_resize_session(self.inner, session.inner_mut());
+        }
+    }
+
+    /// Get session FLOPS count.
+    ///
+    /// # Arguments
+    /// * `session` - The session to query
+    ///
+    /// # Returns
+    /// FLOPS count in millions.
+    pub fn get_session_flops(&self, session: &Session) -> f32 {
+        unsafe {
+            mnn_rs_sys::mnn_interpreter_get_session_flops(self.inner, session.inner())
+        }
+    }
+
+    /// Get session operator count.
+    ///
+    /// # Arguments
+    /// * `session` - The session to query
+    ///
+    /// # Returns
+    /// Operator count (approximate, based on FLOPS).
+    pub fn get_session_op_count(&self, session: &Session) -> i32 {
+        unsafe {
+            mnn_rs_sys::mnn_interpreter_get_session_op_count(self.inner, session.inner())
         }
     }
 }

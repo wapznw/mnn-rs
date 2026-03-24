@@ -178,6 +178,42 @@ impl Session {
     pub fn flops(&self) -> f32 {
         unsafe { mnn_rs_sys::mnn_interpreter_get_session_flops(self.interpreter, self.inner) }
     }
+
+    /// Get the raw pointer to the underlying MNN session.
+    ///
+    /// # Safety
+    /// The returned pointer is owned by this Session and must not be freed.
+    pub fn inner(&self) -> *mut MNNSession {
+        self.inner
+    }
+
+    /// Get the mutable raw pointer to the underlying MNN session.
+    ///
+    /// # Safety
+    /// The returned pointer is owned by this Session and must not be freed.
+    pub fn inner_mut(&mut self) -> *mut MNNSession {
+        self.inner
+    }
+
+    /// Get the interpreter pointer (not owned).
+    ///
+    /// # Safety
+    /// The returned pointer is owned by the Interpreter.
+    pub fn interpreter(&self) -> *mut mnn_rs_sys::MNNInterpreter {
+        self.interpreter
+    }
+
+    /// Create a new session from raw pointers.
+    ///
+    /// # Safety
+    /// The pointers must be valid and the interpreter must outlive the session.
+    pub unsafe fn from_ptr(inner: *mut MNNSession, interpreter: *mut mnn_rs_sys::MNNInterpreter) -> Self {
+        Self {
+            inner,
+            interpreter,
+            has_run: false,
+        }
+    }
 }
 
 impl Drop for Session {

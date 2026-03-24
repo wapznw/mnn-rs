@@ -790,6 +790,8 @@ jobs:
       - build-macos
       - build-android
       - build-ios
+      - build-windows-cuda
+      - build-linux-cuda
       - build-windows-opencl
       - build-linux-opencl
       - build-linux-vulkan

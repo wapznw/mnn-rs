@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* ============================================================================
  * Type Definitions (using MNN's types)
@@ -27,6 +28,12 @@ typedef struct MNNSessionHandle MNNSession;
 
 /** Opaque handle to MNN Tensor */
 typedef struct MNNTensorHandle MNNTensor;
+
+/** Opaque handle to MNN ImageProcess */
+typedef struct MNNImageProcessHandle MNNImageProcess;
+
+/** Opaque handle to MNN Matrix */
+typedef struct MNNMatrixHandle MNNMatrix;
 
 /** Forward/Backend type (matches MNN's definition) */
 typedef int MNNForwardTypeWrapper;
@@ -42,6 +49,33 @@ typedef int MNNErrorCodeWrapper;
 #define MNN_ERROR_OUT_OF_MEMORY 1
 #define MNN_ERROR_NOT_SUPPORT 2
 #define MNN_ERROR_EXECUTION 9
+
+/* Image format (matches MNN::CV::ImageFormat) */
+#define MNN_IMAGE_FORMAT_RGBA      0
+#define MNN_IMAGE_FORMAT_RGB       1
+#define MNN_IMAGE_FORMAT_BGR       2
+#define MNN_IMAGE_FORMAT_GRAY      3
+#define MNN_IMAGE_FORMAT_BGRA      4
+#define MNN_IMAGE_FORMAT_YCRCB     5
+#define MNN_IMAGE_FORMAT_YUV       6
+#define MNN_IMAGE_FORMAT_HSV       7
+#define MNN_IMAGE_FORMAT_XYZ       8
+#define MNN_IMAGE_FORMAT_BGR555    9
+#define MNN_IMAGE_FORMAT_BGR565    10
+#define MNN_IMAGE_FORMAT_YUV_NV21  11
+#define MNN_IMAGE_FORMAT_YUV_NV12  12
+#define MNN_IMAGE_FORMAT_YUV_I420  13
+#define MNN_IMAGE_FORMAT_HSV_FULL  14
+
+/* Filter type (matches MNN::CV::Filter) */
+#define MNN_FILTER_NEAREST   0
+#define MNN_FILTER_BILINEAR  1
+#define MNN_FILTER_BICUBIC   2
+
+/* Wrap type (matches MNN::CV::Wrap) */
+#define MNN_WRAP_CLAMP_TO_EDGE  0
+#define MNN_WRAP_ZERO           1
+#define MNN_WRAP_REPEAT         2
 
 /* ============================================================================
  * Version and Info
@@ -120,6 +154,201 @@ int mnn_tensor_get_type_code(const MNNTensor* tensor);
 
 /** Get tensor dimension type (NHWC/NCHW/NC4HW4) */
 int mnn_tensor_get_dimension_type(const MNNTensor* tensor);
+
+/* ============================================================================
+ * ImageProcess Functions
+ * ============================================================================ */
+
+/** ImageProcess config structure */
+typedef struct {
+    int filterType;           /**< Filter type: NEAREST, BILINEAR, BICUBIC */
+    int sourceFormat;         /**< Source image format */
+    int destFormat;           /**< Destination image format */
+    float mean[4];            /**< Mean values for normalization */
+    float normal[4];          /**< Normalization scales */
+    int wrap;                 /**< Edge wrap type */
+} MNNImageProcessConfig;
+
+/** Create image process with config */
+MNNImageProcess* mnn_image_process_create(const MNNImageProcessConfig* config);
+
+/** Destroy image process */
+void mnn_image_process_destroy(MNNImageProcess* process);
+
+/** Set transform matrix */
+void mnn_image_process_set_matrix(MNNImageProcess* process, const MNNMatrix* matrix);
+
+/** Convert image to tensor
+ * @param process image process
+ * @param source source image data
+ * @param iw source image width
+ * @param ih source image height
+ * @param stride bytes per row
+ * @param tensor destination tensor
+ * @return error code
+ */
+int mnn_image_process_convert(MNNImageProcess* process, const uint8_t* source,
+                               int iw, int ih, int stride, MNNTensor* tensor);
+
+/** Create image tensor
+ * @param w image width
+ * @param h image height
+ * @param bpp bytes per pixel
+ * @param data optional pixel data
+ * @return created tensor
+ */
+MNNTensor* mnn_image_tensor_create(int w, int h, int bpp, void* data);
+
+/** Destroy image tensor */
+void mnn_image_tensor_destroy(MNNTensor* tensor);
+
+/* ============================================================================
+ * Matrix Functions
+ * ============================================================================ */
+
+/** Create identity matrix */
+MNNMatrix* mnn_matrix_create_identity(void);
+
+/** Create scale matrix */
+MNNMatrix* mnn_matrix_create_scale(float sx, float sy);
+
+/** Create translate matrix */
+MNNMatrix* mnn_matrix_create_translate(float dx, float dy);
+
+/** Create rotate matrix (degrees) */
+MNNMatrix* mnn_matrix_create_rotate(float degrees);
+
+/** Create matrix from raw data (9 floats) */
+MNNMatrix* mnn_matrix_create(const float* data);
+
+/** Clone matrix */
+MNNMatrix* mnn_matrix_clone(const MNNMatrix* matrix);
+
+/** Destroy matrix */
+void mnn_matrix_destroy(MNNMatrix* matrix);
+
+/** Get matrix element at (row, col) */
+float mnn_matrix_get(const MNNMatrix* matrix, int row, int col);
+
+/** Set matrix element at (row, col) */
+void mnn_matrix_set(MNNMatrix* matrix, int row, int col, float value);
+
+/** Multiply two matrices */
+MNNMatrix* mnn_matrix_multiply(const MNNMatrix* a, const MNNMatrix* b);
+
+/** Invert matrix */
+MNNMatrix* mnn_matrix_invert(const MNNMatrix* matrix);
+
+/* ============================================================================
+ * Tensor Advanced Functions (GPU Memory Operations)
+ * ============================================================================ */
+
+/** Map type for GPU memory access */
+#define MNN_MAP_TYPE_READ   0
+#define MNN_MAP_TYPE_WRITE  1
+
+/** Copy data from host tensor to device tensor */
+int mnn_tensor_copy_from_host(MNNTensor* dest, const MNNTensor* host_tensor);
+
+/** Copy data from device tensor to host tensor */
+int mnn_tensor_copy_to_host(MNNTensor* host_tensor, const MNNTensor* dest);
+
+/** Create a device tensor with given shape */
+MNNTensor* mnn_tensor_create_device(
+    const int* shape,
+    int dimensions,
+    int type_code,
+    int format
+);
+
+/** Clone a tensor
+ * @param tensor source tensor
+ * @param deep_copy if 1, copy data; if 0, only copy metadata
+ * @return cloned tensor
+ */
+MNNTensor* mnn_tensor_clone(const MNNTensor* tensor, int deep_copy);
+
+/** Destroy a user-created tensor */
+void mnn_tensor_destroy(MNNTensor* tensor);
+
+/** Get tensor device ID (for GPU tensors) */
+uint64_t mnn_tensor_device_id(const MNNTensor* tensor);
+
+/** Get tensor backend type */
+int mnn_tensor_get_backend(const MNNTensor* tensor);
+
+/* ============================================================================
+ * Session Advanced Functions
+ * ============================================================================ */
+
+/** Session mode */
+#define MNN_SESSION_MODE_DEBUG          0
+#define MNN_SESSION_MODE_RELEASE        1
+#define MNN_SESSION_MODE_INPUT_INSIDE   2
+#define MNN_SESSION_MODE_INPUT_USER     3
+#define MNN_SESSION_MODE_OUTPUT_INSIDE  4
+#define MNN_SESSION_MODE_OUTPUT_USER    5
+#define MNN_SESSION_MODE_RESIZE_DIRECT  6
+#define MNN_SESSION_MODE_RESIZE_DEFER   7
+#define MNN_SESSION_MODE_BACKEND_FIX    8
+#define MNN_SESSION_MODE_BACKEND_AUTO   9
+
+/** Set session mode */
+void mnn_interpreter_set_session_mode(MNNInterpreter* interpreter, int mode);
+
+/** Set cache file for optimization */
+void mnn_interpreter_set_cache_file(MNNInterpreter* interpreter, const char* path, size_t key_size);
+
+/** Update cache from session */
+int mnn_interpreter_update_cache(MNNInterpreter* interpreter, MNNSession* session);
+
+/** Set external file for model */
+void mnn_interpreter_set_external_file(MNNInterpreter* interpreter, const char* path, size_t flag);
+
+/** Get input tensor names */
+typedef struct {
+    char** names;
+    int count;
+} MNNStringArray;
+
+MNNStringArray mnn_interpreter_get_input_names(MNNInterpreter* interpreter, MNNSession* session);
+MNNStringArray mnn_interpreter_get_output_names(MNNInterpreter* interpreter, MNNSession* session);
+
+/** Free string array */
+void mnn_string_array_free(MNNStringArray* array);
+
+/** Resize tensor with new shape */
+void mnn_interpreter_resize_tensor(MNNInterpreter* interpreter, MNNTensor* tensor, const int* shape, int dims);
+
+/** Get operator info count */
+int mnn_interpreter_get_session_op_count(MNNInterpreter* interpreter, MNNSession* session);
+
+/* ============================================================================
+ * Runtime Management (Multi-Session Sharing)
+ * ============================================================================ */
+
+/** Opaque handle to MNN RuntimeManager */
+typedef struct MNNRuntimeManagerHandle MNNRuntimeManager;
+
+/** Create runtime manager from config */
+MNNRuntimeManager* mnn_runtime_manager_create(int type, int num_threads);
+
+/** Destroy runtime manager */
+void mnn_runtime_manager_destroy(MNNRuntimeManager* manager);
+
+/** Create session with shared runtime
+ * @param interpreter Interpreter
+ * @param runtime Runtime manager
+ * @param type Backend type
+ * @param num_threads Number of threads
+ * @return Session or NULL on failure
+ */
+MNNSession* mnn_interpreter_create_session_with_runtime(
+    MNNInterpreter* interpreter,
+    MNNRuntimeManager* runtime,
+    int type,
+    int num_threads
+);
 
 #ifdef __cplusplus
 }

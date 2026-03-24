@@ -3,7 +3,7 @@
 //! This module provides safe wrappers around MNN tensor operations,
 //! including creating, reading, and writing tensor data.
 
-use crate::backend::DataType;
+use crate::backend::{DataType, BackendType};
 use crate::config::DataFormat;
 use crate::error::{MnnError, MnnResult};
 use mnn_rs_sys::MNNTensor;
@@ -59,6 +59,24 @@ impl Tensor {
     /// The pointer must be valid and remain valid for the lifetime of this tensor.
     pub(crate) unsafe fn from_ptr_with_name(ptr: *mut MNNTensor, name: Option<String>) -> Self {
         Self { inner: ptr, name }
+    }
+
+    /// Create a tensor wrapper around an existing MNN tensor pointer (public version).
+    ///
+    /// # Safety
+    /// The pointer must be valid and remain valid for the lifetime of this tensor.
+    pub unsafe fn from_ptr(ptr: *mut MNNTensor, name: Option<String>) -> Self {
+        Self { inner: ptr, name }
+    }
+
+    /// Get the mutable raw pointer to the underlying MNN tensor.
+    pub fn inner_mut(&mut self) -> *mut MNNTensor {
+        self.inner
+    }
+
+    /// Get the raw pointer to the underlying MNN tensor.
+    pub fn as_ptr(&self) -> *const MNNTensor {
+        self.inner
     }
 
     /// Get the shape of the tensor.
@@ -231,6 +249,121 @@ impl Tensor {
             dtype: self.dtype(),
             format: self.format(),
         }
+    }
+
+    // ========================================================================
+    // GPU Memory Operations
+    // ========================================================================
+
+    /// Copy data from a host tensor to this tensor (potentially on device).
+    ///
+    /// # Arguments
+    /// * `host_tensor` - The host tensor to copy from
+    ///
+    /// # Returns
+    /// Ok(()) on success, or an error on failure.
+    pub fn copy_from_host(&mut self, host_tensor: &Tensor) -> MnnResult<()> {
+        let result = unsafe {
+            mnn_rs_sys::mnn_tensor_copy_from_host(self.inner, host_tensor.inner)
+        };
+
+        if result != mnn_rs_sys::MNN_ERROR_NONE as i32 {
+            return Err(MnnError::internal("Failed to copy from host tensor"));
+        }
+
+        Ok(())
+    }
+
+    /// Copy data from this tensor (potentially on device) to a host tensor.
+    ///
+    /// # Arguments
+    /// * `host_tensor` - The host tensor to copy to
+    ///
+    /// # Returns
+    /// Ok(()) on success, or an error on failure.
+    pub fn copy_to_host(&self, host_tensor: &mut Tensor) -> MnnResult<()> {
+        let result = unsafe {
+            mnn_rs_sys::mnn_tensor_copy_to_host(host_tensor.inner, self.inner)
+        };
+
+        if result != mnn_rs_sys::MNN_ERROR_NONE as i32 {
+            return Err(MnnError::internal("Failed to copy to host tensor"));
+        }
+
+        Ok(())
+    }
+
+    /// Create a device tensor with the given shape and format.
+    ///
+    /// # Arguments
+    /// * `shape` - The tensor shape
+    /// * `format` - The data format (NHWC, NCHW, etc.)
+    /// * `dtype` - The data type
+    ///
+    /// # Returns
+    /// A new device tensor on success, or an error on failure.
+    pub fn create_device(
+        shape: &[i32],
+        format: DataFormat,
+        dtype: DataType,
+    ) -> MnnResult<Tensor> {
+        if shape.is_empty() {
+            return Err(MnnError::internal("Shape cannot be empty"));
+        }
+
+        let type_code = dtype.to_type_code();
+        let format_code = format.to_mnn();
+
+        let inner = unsafe {
+            mnn_rs_sys::mnn_tensor_create_device(
+                shape.as_ptr(),
+                shape.len() as i32,
+                type_code,
+                format_code,
+            )
+        };
+
+        if inner.is_null() {
+            return Err(MnnError::internal("Failed to create device tensor"));
+        }
+
+        Ok(unsafe { Tensor::from_ptr(inner, None) })
+    }
+
+    /// Clone this tensor.
+    ///
+    /// # Arguments
+    /// * `deep_copy` - If true, copy data; if false, only copy metadata
+    ///
+    /// # Returns
+    /// A cloned tensor on success, or an error on failure.
+    pub fn clone(&self, deep_copy: bool) -> MnnResult<Tensor> {
+        let inner = unsafe {
+            mnn_rs_sys::mnn_tensor_clone(self.inner, if deep_copy { 1 } else { 0 })
+        };
+
+        if inner.is_null() {
+            return Err(MnnError::internal("Failed to clone tensor"));
+        }
+
+        Ok(unsafe { Tensor::from_ptr(inner, None) })
+    }
+
+    /// Get the device ID for this tensor (for GPU tensors).
+    ///
+    /// # Returns
+    /// The device ID, or 0 if not a GPU tensor or unknown.
+    pub fn device_id(&self) -> u64 {
+        unsafe { mnn_rs_sys::mnn_tensor_device_id(self.inner) }
+    }
+
+    /// Get the backend type for this tensor.
+    ///
+    /// # Returns
+    /// The backend type (CPU, CUDA, OpenCL, etc.).
+    pub fn backend(&self) -> BackendType {
+        let backend_code = unsafe { mnn_rs_sys::mnn_tensor_get_backend(self.inner) };
+        BackendType::from_mnn_type(backend_code)
     }
 }
 
