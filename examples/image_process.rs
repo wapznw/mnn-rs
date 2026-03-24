@@ -1,206 +1,214 @@
 //! Image preprocessing example using MNN ImageProcess module.
 //!
-//! This example demonstrates image preprocessing operations:
-//! - Converting image formats (RGB/BGR/RGBA/etc.)
-//! - Applying normalization (mean/std)
-//! - Resizing with bilinear interpolation
-//! - Converting to tensor format
-//!
-//! Note: This example uses raw RGB pixel data. In real applications,
-//! you would load images from files using a library like `image`.
+//! This example demonstrates:
+//! - Image format conversion (RGB to BGR)
+//! - Image resizing using Matrix transformation
+//! - Optional: imread/imwrite/resize using MNN CV (requires special build)
 //!
 //! Usage:
 //! ```bash
+//! # Basic usage with generated test pattern
 //! cargo run --example image_process --features image-process
+//!
+//! # With custom image (requires MNN with IMGCODECS)
+//! cargo run --example image_process -- input.jpg output.png
 //! ```
 
 #[cfg(feature = "image-process")]
 use mnn_rs::{
-    ImageConfig, ImageFormat, ImageProcess, Matrix, Filter, Wrap, Tensor, MnnError,
+    imread, imwrite,
+    ImageConfig, ImageFormat, ImageProcess, Matrix, Filter, Wrap,
+    ImreadFlags,
 };
 
 #[cfg(feature = "image-process")]
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), mnn_rs::MnnError> {
     use std::env;
+    use std::path::Path;
 
     println!("=== MNN Rust Image Process Example ===\n");
 
     // Parse command line arguments
-    let width: i32 = env::args().nth(1).and_then(|s| s.parse().ok()).unwrap_or(224);
-    let height: i32 = env::args().nth(2).and_then(|s| s.parse().ok()).unwrap_or(224);
+    let input_path = env::args().nth(1).unwrap_or_else(|| String::new());
+    let output_path = env::args().nth(2).unwrap_or_else(|| "output.png".to_string());
 
-    println!("[Step 1] Creating sample image data ({}x{})", width, height);
+    // Check if input path is provided and exists
+    let use_test_image = input_path.is_empty() || !Path::new(&input_path).exists();
 
-    // Create sample RGB image data (simulating a loaded image)
-    // In real applications, you would load from file using image crate:
-    // ```rust
-    // let img = image::open("photo.jpg")?;
-    // let rgb_img = img.to_rgb8();
-    // let image_data = rgb_img.as_raw();
-    // ```
-    let image_data: Vec<u8> = (0..(width * height * 3))
-        .map(|i| ((i as u32 * 7 + 123) % 256) as u8)  // Pattern data
-        .collect();
-    println!("  Created {} bytes of RGB data", image_data.len());
+    if use_test_image {
+        println!("[Step 1] Using generated test pattern");
+        println!("  Note: Provide an image path to use imread:");
+        println!("  cargo run --example image_process -- input.jpg output.png\n");
 
-    // Show sample pixels
-    println!("  Sample pixels (first 3):");
-    for i in 0..3 {
-        let idx = i * 3;
-        println!("    Pixel {}: R={}, G={}, B={}", i,
-                 image_data[idx], image_data[idx + 1], image_data[idx + 2]);
-    }
+        // Create a colorful test pattern
+        let (width, height) = (256i32, 256i32);
+        println!("  Creating test pattern: {}x{}", width, height);
 
+        let image_data: Vec<u8> = (0..(width * height * 3) as usize)
+            .map(|i| {
+                let x = (i / 3) % width as usize;
+                let y = (i / 3) / width as usize;
+                let r = ((x * 255 / width as usize) as u8).wrapping_add((y * 100 / height as usize) as u8);
+                let g = ((x * 100 / width as usize) as u8).wrapping_add((y * 255 / height as usize) as u8);
+                let b = ((x * 128 / width as usize) as u8).wrapping_add((y * 128 / height as usize) as u8);
+                [r, g, b][i % 3]
+            })
+            .collect();
+
+        println!("  Generated {} bytes", image_data.len());
+
+        process_image(&image_data, width, height, 224, 224, &output_path, false)
+    } else {
+        // Use MNN CV imread to load image
+        println!("[Step 1] Loading image using MNN CV::imread");
+        println!("  Input: {}", input_path);
+
+        match imread(&input_path, ImreadFlags::Color) {
+            Ok(img) => {
+                let shape = img.shape();
+                let (height, width, channels) = if shape.len() >= 4 {
+                    (shape[1], shape[2], shape[3])
+                } else {
+                    (shape[0], shape[1], shape[2])
+                };
+
+                println!("  Loaded: {}x{}x{}", width, height, channels);
+                println!("  Dtype: {}", img.dtype());
+
+                let image_data: Vec<u8> = img.read()?;
+                println!("  Read {} bytes", image_data.len());
+
+                process_image(&image_data, width, height, 224, 224, &output_path, true)
+            }
+            Err(e) => {
+                eprintln!("  imread failed: {}", e);
+                eprintln!("  MNN CV imread requires: -DMNN_IMGCODECS=ON");
+                eprintln!("  Falling back to test pattern...");
+
+                let (width, height) = (256i32, 256i32);
+                let image_data: Vec<u8> = (0..(width * height * 3) as usize)
+                    .map(|i| ((i * 7) % 256) as u8)
+                    .collect();
+                process_image(&image_data, width, height, 224, 224, &output_path, false)
+            }
+        }
+    };
+
+    println!("\n=== Processing completed! ===");
+    Ok(())
+}
+
+#[cfg(feature = "image-process")]
+fn process_image(
+    image_data: &[u8],
+    src_width: i32,
+    src_height: i32,
+    target_width: i32,
+    target_height: i32,
+    output_path: &str,
+    loaded_from_file: bool,
+) -> Result<(), mnn_rs::MnnError> {
     println!("\n[Step 2] Creating ImageProcess configuration");
 
-    // Create image process config
-    // This config converts RGB to BGR (common for CV models)
-    // Using no normalization for this simple demo
+    // Create config: RGB to BGR conversion with bilinear filtering
     let config = ImageConfig {
         source_format: ImageFormat::Rgb,
         dest_format: ImageFormat::Bgr,
         filter: Filter::Bilinear,
-        mean: [0.0, 0.0, 0.0, 0.0],  // No mean subtraction
-        normal: [1.0, 1.0, 1.0, 1.0],  // No normalization
+        mean: [0.0; 4],
+        normal: [1.0; 4],
         wrap: Wrap::ClampToEdge,
     };
 
-    println!("  Source format: {:?}", config.source_format);
-    println!("  Dest format: {:?}", config.dest_format);
-    println!("  Filter: {:?}", config.filter);
-    println!("  Mean: {:?}", config.mean);
-    println!("  Normal: {:?}", config.normal);
-
-    println!("\n[Step 3] Creating ImageProcess instance");
     let mut image_process = ImageProcess::new(&config)?;
-    println!("  ImageProcess created successfully");
+    println!("  Config: RGB → BGR, Bilinear filter");
 
-    println!("\n[Step 4] Creating transformation matrix");
+    println!("\n[Step 3] Setting up transformation matrix");
 
-    // Create identity matrix (no transformation)
-    let mut matrix = Matrix::identity();
-    println!("  Identity matrix created");
+    // Calculate scale for resizing
+    let scale_x = target_width as f32 / src_width as f32;
+    let scale_y = target_height as f32 / src_height as f32;
+    println!("  Scale: {:.3} x {:.3}", scale_x, scale_y);
 
-    // Optionally apply scaling
-    let scale = 224.0 / width.max(height) as f32;
-    if scale < 1.0 {
-        println!("  Applying scale: {:.4}", scale);
-        matrix = Matrix::scale(scale, scale);
-    }
-
+    // Create and set scale matrix
+    let matrix = Matrix::scale(scale_x, scale_y);
     image_process.set_matrix(&matrix);
-    println!("  Matrix applied to ImageProcess");
+    println!("  Matrix set");
 
-    println!("\n[Step 5] Creating output tensor using ImageProcess");
+    println!("\n[Step 4] Creating output tensor");
 
-    // Create output tensor using ImageProcess helper
-    // This creates a tensor suitable for image operations (224x224x3 = BGR)
-    let output_width = 224;
-    let output_height = 224;
+    // Create output tensor (224x224x3 BGR)
     let mut output_tensor = ImageProcess::create_image_tensor(
-        output_width,
-        output_height,
-        3,  // 3 channels (BGR)
-        None,  // No initial data
+        target_width, target_height, 3, None
     )?;
+    println!("  Tensor shape: {:?}", output_tensor.shape());
+    println!("  Tensor dtype: {}", output_tensor.dtype());
 
-    println!("  Output tensor shape: {:?}", output_tensor.shape());
-    println!("  Output tensor dtype: {}", output_tensor.dtype());
+    println!("\n[Step 5] Converting image (resize + RGB→BGR)");
 
-    println!("\n[Step 6] Converting image to tensor");
-
-    // Perform the image conversion
-    // stride = 0 means width * channels
+    // Perform conversion with resizing
     image_process.convert(
-        &image_data,
-        width as i32,
-        height as i32,
-        0,  // stride (0 = auto)
+        image_data,
+        src_width,
+        src_height,
+        0,  // stride (auto = width * channels)
         &mut output_tensor,
     )?;
+    println!("  Conversion completed");
 
-    println!("  Image conversion completed");
+    println!("\n[Step 6] Analyzing output");
 
-    println!("\n[Step 7] Reading and analyzing output");
-
-    // Read output data as u8 (image tensor is u8 type)
+    // Read output data
     let output_data: Vec<u8> = output_tensor.read()?;
-    println!("  Output data: {} elements", output_data.len());
+    println!("  Output: {} bytes", output_data.len());
 
-    // Calculate statistics (convert to f32 for calculation)
-    let min_val = output_data.iter().cloned().map(|x| x as f32).fold(f32::INFINITY, f32::min);
-    let max_val = output_data.iter().cloned().map(|x| x as f32).fold(f32::NEG_INFINITY, f32::max);
-    let sum: f32 = output_data.iter().map(|&x| x as f32).sum();
-    let mean = sum / output_data.len() as f32;
+    // Statistics
+    let min_val = output_data.iter().cloned().min().unwrap_or(0);
+    let max_val = output_data.iter().cloned().max().unwrap_or(255);
+    let sum: u32 = output_data.iter().map(|&x| x as u32).sum();
+    let mean = sum as f32 / output_data.len() as f32;
 
-    println!("\n  Output statistics:");
-    println!("    Min: {:.6}", min_val);
-    println!("    Max: {:.6}", max_val);
-    println!("    Mean: {:.6}", mean);
+    println!("  Min: {}, Max: {}, Mean: {:.2}", min_val, max_val, mean);
 
-    // Print sample values from each channel
-    println!("\n  Sample values (first 3x3 pixels, BGR order):");
-    for row in 0..3 {
-        for col in 0..3 {
-            let idx = (row * output_width * 3 + col * 3) as usize;
-            if idx + 2 < output_data.len() {
-                println!("    [{},{}]: B={}, G={}, R={}",
-                         row, col,
-                         output_data[idx],
-                         output_data[idx + 1],
-                         output_data[idx + 2]);
-            }
+    // Sample pixels
+    println!("\n  Sample pixels (BGR order):");
+    for i in 0..3.min(output_data.len() / 3) {
+        let idx = i * 3;
+        println!("    [{}]: B={}, G={}, R={}", i,
+                 output_data[idx], output_data[idx + 1], output_data[idx + 2]);
+    }
+
+    println!("\n[Step 7] Saving result");
+
+    // Create tensor for saving
+    let save_tensor = ImageProcess::create_image_tensor(
+        target_width, target_height, 3, Some(&output_data),
+    )?;
+
+    // Try to save using MNN CV imwrite
+    match imwrite(output_path, &save_tensor) {
+        Ok(()) => {
+            println!("  Saved to: {}", output_path);
+            println!("  Output format inferred from extension");
+        }
+        Err(e) => {
+            println!("  imwrite not available: {}", e);
+            println!("  Enable with: -DMNN_IMGCODECS=ON");
         }
     }
 
-    // Show first few raw bytes
-    println!("\n  First 12 bytes (4 pixels): {:?}", &output_data[..12]);
-
-    println!("\n[Step 8] Demonstrate other image formats");
-
-    // Demonstrate creating tensors with different formats
-    let formats = [
-        (ImageFormat::Rgba, "RGBA"),
-        (ImageFormat::Gray, "Grayscale"),
-        (ImageFormat::Bgra, "BGRA"),
-        (ImageFormat::Yuv, "YUV"),
-    ];
-
-    for (fmt, name) in formats.iter() {
-        let cfg = ImageConfig {
-            source_format: *fmt,
-            dest_format: ImageFormat::Rgb,
-            filter: Filter::Nearest,
-            mean: [0.0; 4],
-            normal: [1.0; 4],
-            wrap: Wrap::ClampToEdge,
-        };
-        let ip = ImageProcess::new(&cfg);
-        println!("  {} format supported: {}", name, ip.is_ok());
+    if loaded_from_file {
+        println!("\nWorkflow (with MNN CV):");
+        println!("  imread() → ImageProcess (convert+resize) → imwrite()");
+    } else {
+        println!("\nWorkflow:");
+        println!("  Raw data → ImageProcess (convert+resize) → output tensor");
     }
 
-    println!("\n[Step 9] Demonstrate Matrix operations");
-
-    // Demonstrate different matrix transformations
-    let matrices = [
-        ("Identity", Matrix::identity()),
-        ("Scale 2x", Matrix::scale(2.0, 2.0)),
-        ("Scale 0.5x", Matrix::scale(0.5, 0.5)),
-        ("Translate (10, 20)", Matrix::translate(10.0, 20.0)),
-        ("Rotate 90°", Matrix::rotate(90.0)),
-        ("Rotate 180°", Matrix::rotate(180.0)),
-    ];
-
-    for (name, _matrix) in matrices.iter() {
-        println!("  {} - created", name);
-    }
-
-    println!("\n=== Image processing completed successfully! ===");
-    println!("Note: To save the processed image, you would need to:");
-    println!("  1. Convert CHW format back to HWC");
-    println!("  2. Denormalize the values");
-    println!("  3. Convert f32 to u8");
-    println!("  4. Use image crate to save");
+    println!("\nNote: For neural network inference with normalization:");
+    println!("  - Set mean=[103.94, 116.78, 123.68, 0]");
+    println!("  - Set normal=[0.017, 0.017, 0.017, 1.0]");
+    println!("  - Output tensor must be float32 type (use MNN Express)");
 
     Ok(())
 }
