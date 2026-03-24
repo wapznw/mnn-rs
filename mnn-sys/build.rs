@@ -49,8 +49,10 @@
 
 use std::env;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::process::Command;
+use std::collections::hash_map::DefaultHasher;
 
 /// MNN version for prebuilt binaries - automatically reads from Cargo.toml
 const MNN_VERSION: &str = env!("CARGO_PKG_VERSION");

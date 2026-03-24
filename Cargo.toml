@@ -114,3 +114,7 @@ required-features = ["async"]
 [[example]]
 name = "gpu_backend"
 required-features = ["cuda"]
+
+[[example]]
+name = "image_process"
+required-features = ["image-process"]
