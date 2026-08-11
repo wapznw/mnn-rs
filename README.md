@@ -64,9 +64,27 @@ If you have a pre-built MNN library, you can use it directly:
 export MNN_LIB_DIR=/path/to/mnn/lib
 export MNN_INCLUDE_DIR=/path/to/mnn/include
 
-# Build without auto-download
+# Build without auto-download (static MNN)
 cargo build --no-default-features --features cpu,static
 ```
+
+### Linking a Dynamic MNN (DLL)
+
+To link against a system dynamic MNN (e.g. a Windows Dynamic/MD package):
+
+```bash
+# Windows (set MNN library paths)
+set MNN_LIB_DIR=C:\path\to\mnn\lib
+set MNN_INCLUDE_DIR=C:\path\to\mnn\include
+
+# Dynamic linking - note: --no-default-features is required to avoid the
+# default 'static' feature
+cargo build --no-default-features --features cpu,dynamic,system-mnn
+```
+
+On MSVC, the C++ wrapper is compiled with the CRT matching the link mode:
+`/MT` for static MNN, `/MD` for dynamic MNN. If your MNN library was built
+with a different CRT, override it with `MNN_MSVC_RUNTIME=MT|MD`.
 
 ## Usage
 
@@ -127,7 +145,7 @@ async fn main() -> Result<(), MnnError> {
 | Feature | Description |
 |---------|-------------|
 | `static` (default) | Static link MNN library |
-| `dynamic` | Dynamic link MNN library |
+| `dynamic` | Dynamic link MNN library. Requires `--no-default-features` (conflicts with the default `static`) |
 
 ### Backend Support
 
@@ -278,6 +296,7 @@ cargo build --target x86_64-pc-windows-gnu
 | `MNN_LIB_DIR` | Path to pre-built MNN library |
 | `MNN_INCLUDE_DIR` | Path to MNN headers |
 | `MNN_DEBUG_BUILD` | Print debug information during build |
+| `MNN_MSVC_RUNTIME` | Override MSVC C runtime for the C++ wrapper: `MT` (static CRT) or `MD` (dynamic CRT). Defaults to `/MT` for static linking and `/MD` for dynamic linking |
 | `CUDA_PATH` | CUDA installation path |
 | `ANDROID_NDK_HOME` | Android NDK installation path |
 

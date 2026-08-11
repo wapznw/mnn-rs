@@ -247,7 +247,12 @@ fn main() {
     let dynamic_link = cfg!(feature = "dynamic");
 
     if static_link && dynamic_link {
-        panic!("Cannot enable both 'static' and 'dynamic' features simultaneously");
+        panic!(
+            "Cannot enable both 'static' and 'dynamic' features simultaneously.\n\
+             The 'dynamic' feature conflicts with the default 'static' feature.\n\
+             When using 'dynamic', disable default features:\n\
+             cargo build --no-default-features --features cpu,dynamic[,system-mnn|build-from-source]"
+        );
     }
 
     // If no link mode specified, default to static
@@ -462,9 +467,24 @@ fn main() {
     // Set C++ standard and compiler flags based on TARGET (not host)
     if target_env == "msvc" {
         build.flag("/std:c++14");
-        // Prebuilt MNN binaries are built with /MT (static runtime)
-        // When building from source, we also use /MT for consistency
-        build.flag("/MT");
+        // The wrapper's CRT must match the linked MNN library's CRT:
+        //   - static / prebuilt MNN is built with /MT (static CRT)
+        //   - dynamic MNN (DLL, e.g. a system Dynamic/MD package) uses /MD
+        // Mixing them triggers LNK4098 (LIBCMT conflicts with other libs).
+        // Override with MNN_MSVC_RUNTIME=MT|MD when the MNN library was built
+        // with a different CRT than the default for the chosen link mode.
+        let msvc_runtime = env::var("MNN_MSVC_RUNTIME")
+            .ok()
+            .map(|v| v.to_uppercase())
+            .filter(|v| v == "MT" || v == "MD")
+            .unwrap_or_else(|| if use_static { "MT".to_string() } else { "MD".to_string() });
+        build.flag(format!("/{}", msvc_runtime));
+        if debug_build {
+            println!(
+                "cargo:warning=mnn-sys: MSVC runtime: /{} (use_static={})",
+                msvc_runtime, use_static
+            );
+        }
     } else {
         build.flag_if_supported("-std=c++14");
     }
@@ -522,6 +542,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=MNN_LIB_DIR");
     println!("cargo:rerun-if-env-changed=MNN_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=MNN_USE_SYSTEM");
+    println!("cargo:rerun-if-env-changed=MNN_MSVC_RUNTIME");
     println!("cargo:rerun-if-env-changed=MNN_PREBUILT_URL");
     println!("cargo:rerun-if-env-changed=CUDA_PATH");
     println!("cargo:rerun-if-env-changed=ANDROID_NDK_HOME");
@@ -714,6 +735,18 @@ fn compute_config_hash(
     target_arch.hash(&mut hasher);
     use_static.hash(&mut hasher);
 
+    // The MSVC CRT choice maps to MNN_WIN_RUNTIME_MT in build-from-source.
+    // Hash it so the cache invalidates when the runtime selection changes
+    // (otherwise a stale dynamic build could keep a /MT-built MNN).
+    if target_os == "windows" && target_env == "msvc" {
+        let msvc_runtime = std::env::var("MNN_MSVC_RUNTIME")
+            .ok()
+            .map(|v| v.to_uppercase())
+            .filter(|v| v == "MT" || v == "MD")
+            .unwrap_or_else(|| if use_static { "MT".to_string() } else { "MD".to_string() });
+        msvc_runtime.hash(&mut hasher);
+    }
+
     // Hash features
     cfg!(feature = "cuda").hash(&mut hasher);
     cfg!(feature = "opencl").hash(&mut hasher);
@@ -847,9 +880,13 @@ fn build_mnn_from_source(
         format!("-DCMAKE_INSTALL_PREFIX={}", install_dir.display()),
     ];
 
-    // On Windows MSVC, use static runtime to match Rust
+    // On Windows MSVC, build MNN with a CRT matching the link mode so the
+    // wrapper and the linked MNN library agree: static -> /MT, dynamic -> /MD
     if target_os == "windows" && target_env == "msvc" {
-        cmake_args.push("-DMNN_WIN_RUNTIME_MT=ON".to_string());
+        cmake_args.push(format!(
+            "-DMNN_WIN_RUNTIME_MT={}",
+            if _static { "ON" } else { "OFF" }
+        ));
     }
 
     // Build static or shared library based on feature

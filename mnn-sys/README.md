@@ -45,7 +45,7 @@ cargo build --no-default-features --features cpu,static
 | Feature | Description |
 |---------|-------------|
 | `static` (default) | Static link MNN |
-| `dynamic` | Dynamic link MNN |
+| `dynamic` | Dynamic link MNN. Requires `--no-default-features` (conflicts with the default `static`) |
 | `build-from-source` | Clone and build MNN from GitHub |
 | `cuda` | Enable CUDA backend |
 | `opencl` | Enable OpenCL backend |
