@@ -57,6 +57,9 @@ image-process = []
 module = []
 # Multi-session runtime sharing (requires MNN with RuntimeManager)
 runtime = []
+# LLM large language model inference (requires MNN built with MNN_BUILD_LLM=ON,
+# which the prebuilt binaries and build-from-source both provide)
+llm = []
 
 # Platform specific
 android = []

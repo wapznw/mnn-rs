@@ -42,7 +42,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         shell: bash
@@ -51,6 +51,7 @@ jobs:
             -G "Visual Studio 17 2022" -A ${{ matrix.arch }} \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_WIN_RUNTIME_MT=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -109,7 +110,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -120,6 +121,7 @@ jobs:
           cmake -B build -S mnn-source -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DMNN_BUILD_SHARED_LIBS=OFF \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -172,7 +174,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with CUDA
         shell: bash
@@ -184,6 +186,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_WIN_RUNTIME_MT=ON \
             -DMNN_CUDA=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -233,7 +236,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with CUDA
         run: |
@@ -243,6 +246,7 @@ jobs:
             -DCMAKE_CUDA_STANDARD=17 \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_CUDA=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -291,7 +295,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -306,6 +310,7 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_METAL=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -365,7 +370,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -384,6 +389,7 @@ jobs:
             -DANDROID_STL=c++_static \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_KLEIDIAI=OFF \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -434,7 +440,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -459,6 +465,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_METAL=$ENABLE_METAL \
             -DMNN_ARM82=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_OPENCL=OFF \
             -DMNN_OPENGL=OFF \
             -DMNN_VULKAN=OFF \
@@ -517,7 +524,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL
         shell: bash
@@ -527,6 +534,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_WIN_RUNTIME_MT=ON \
             -DMNN_OPENCL=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -571,7 +579,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL
         run: |
@@ -579,6 +587,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_OPENCL=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -622,7 +631,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with Vulkan
         run: |
@@ -630,6 +639,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_VULKAN=ON \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -679,7 +689,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL for Android
         run: |
@@ -692,6 +702,7 @@ jobs:
             -DMNN_OPENCL=ON \
             -DMNN_ARM82=ON \
             -DMNN_KLEIDIAI=OFF \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -741,7 +752,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with Vulkan for Android
         run: |
@@ -754,6 +765,7 @@ jobs:
             -DMNN_VULKAN=ON \
             -DMNN_ARM82=ON \
             -DMNN_KLEIDIAI=OFF \
+            -DMNN_BUILD_LLM=ON \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \

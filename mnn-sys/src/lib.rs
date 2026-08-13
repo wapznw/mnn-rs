@@ -440,5 +440,262 @@ extern "C" {
     ) -> *mut MNNSession;
 }
 
+// ============================================================================
+// LLM Support (requires feature = "llm")
+// ============================================================================
+
+/// Opaque handle to an MNN LLM instance (wraps MNN::Transformer::Llm)
+#[cfg(feature = "llm")]
+#[repr(C)]
+pub struct MNNLlm {
+    _private: [u8; 0],
+}
+
+/// Opaque handle to an MNN embedding model (wraps MNN::Transformer::Embedding)
+#[cfg(feature = "llm")]
+#[repr(C)]
+pub struct MNNEmbedding {
+    _private: [u8; 0],
+}
+
+/// Callback receiving incremental text chunks during streaming generation.
+///
+/// The `userdata` pointer is the value passed to `mnn_llm_generate_init`.
+#[cfg(feature = "llm")]
+pub type MnnLlmTextCb = unsafe extern "C" fn(text: *const c_char, userdata: *mut c_void);
+
+/// Snapshot of the LLM context metrics (readable subset of MNN's LlmContext).
+#[cfg(feature = "llm")]
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct MNNLlmContext {
+    /// Length of the prompt (prefill) in tokens
+    pub prompt_len: c_int,
+    /// Number of tokens generated this turn
+    pub gen_seq_len: c_int,
+    /// Total sequence length including history
+    pub all_seq_len: c_int,
+    /// Model load time in microseconds
+    pub load_us: i64,
+    /// Prefill time in microseconds
+    pub prefill_us: i64,
+    /// Decode time in microseconds
+    pub decode_us: i64,
+    /// Sampling time in microseconds
+    pub sample_us: i64,
+}
+
+/// LLM status values (mirrors MNN::Transformer::LlmStatus).
+#[cfg(feature = "llm")]
+pub const MNN_LLM_STATUS_NOT_LOADED: c_int = -1;
+/// Generation is running.
+#[cfg(feature = "llm")]
+pub const MNN_LLM_STATUS_RUNNING: c_int = 0;
+/// Generation finished normally.
+#[cfg(feature = "llm")]
+pub const MNN_LLM_STATUS_NORMAL_FINISHED: c_int = 1;
+/// Generation stopped at the maximum token count.
+#[cfg(feature = "llm")]
+pub const MNN_LLM_STATUS_MAX_TOKENS_FINISHED: c_int = 2;
+/// Generation was cancelled by the user.
+#[cfg(feature = "llm")]
+pub const MNN_LLM_STATUS_USER_CANCEL: c_int = 3;
+/// An internal error occurred.
+#[cfg(feature = "llm")]
+pub const MNN_LLM_STATUS_INTERNAL_ERROR: c_int = 4;
+/// Generation timed out.
+#[cfg(feature = "llm")]
+pub const MNN_LLM_STATUS_TIMEOUT: c_int = 5;
+
+#[cfg(feature = "llm")]
+extern "C" {
+    // ========================================================================
+    // LLM Lifecycle
+    // ========================================================================
+
+    /// Create an LLM instance from a model config.json path.
+    pub fn mnn_llm_create(config_path: *const c_char) -> *mut MNNLlm;
+
+    /// Destroy an LLM instance (may be NULL).
+    pub fn mnn_llm_destroy(llm: *mut MNNLlm);
+
+    /// Load model weights; returns true on success.
+    pub fn mnn_llm_load(llm: *mut MNNLlm) -> bool;
+
+    // ========================================================================
+    // LLM Blocking Generation
+    // ========================================================================
+
+    /// Generate the full text response for a single prompt (blocking).
+    ///
+    /// The returned string must be freed with `mnn_string_free`.
+    pub fn mnn_llm_response_text(
+        llm: *mut MNNLlm,
+        text: *const c_char,
+        max_new_tokens: c_int,
+    ) -> *mut c_char;
+
+    /// Generate the full text response for a chat message list (blocking).
+    ///
+    /// The returned string must be freed with `mnn_string_free`.
+    pub fn mnn_llm_response_messages(
+        llm: *mut MNNLlm,
+        roles: *const *const c_char,
+        contents: *const *const c_char,
+        n: c_int,
+        max_new_tokens: c_int,
+    ) -> *mut c_char;
+
+    // ========================================================================
+    // LLM Token Generation (arrays)
+    // ========================================================================
+
+    /// Generate raw token ids for given input token ids (blocking).
+    ///
+    /// `out_n` is the capacity of `out` on input and the actual number of
+    /// generated tokens on output. Returns the number of generated tokens
+    /// (>= 0) or a negative value on error. If the result exceeds the output
+    /// capacity it is truncated, but the full count is still reported through
+    /// `out_n`.
+    pub fn mnn_llm_generate_tokens(
+        llm: *mut MNNLlm,
+        input_ids: *const c_int,
+        n: c_int,
+        max_new_tokens: c_int,
+        out: *mut c_int,
+        out_n: *mut c_int,
+    ) -> c_int;
+
+    // ========================================================================
+    // LLM Streaming Generation
+    // ========================================================================
+
+    /// Initialize streaming generation with a text callback.
+    ///
+    /// The callback is invoked synchronously with each chunk of generated
+    /// text; `end_with` may be NULL.
+    pub fn mnn_llm_generate_init(
+        llm: *mut MNNLlm,
+        text: *const c_char,
+        cb: Option<MnnLlmTextCb>,
+        userdata: *mut c_void,
+        end_with: *const c_char,
+    );
+
+    /// Run one streaming generation step; returns true when stopped.
+    pub fn mnn_llm_generate_step(llm: *mut MNNLlm, max_token: c_int) -> bool;
+
+    /// Check whether streaming generation has stopped.
+    pub fn mnn_llm_stoped(llm: *mut MNNLlm) -> bool;
+
+    // ========================================================================
+    // LLM Tokenizer and Chat Templates
+    // ========================================================================
+
+    /// Encode text into token ids.
+    ///
+    /// The returned array must be freed with `mnn_int_array_free`.
+    pub fn mnn_llm_tokenizer_encode(
+        llm: *mut MNNLlm,
+        text: *const c_char,
+        out_n: *mut c_int,
+    ) -> *mut c_int;
+
+    /// Decode a single token id into text.
+    ///
+    /// The returned string must be freed with `mnn_string_free`.
+    pub fn mnn_llm_tokenizer_decode(llm: *mut MNNLlm, token: c_int) -> *mut c_char;
+
+    /// Check whether a token id is a stop token.
+    pub fn mnn_llm_is_stop(llm: *mut MNNLlm, token: c_int) -> bool;
+
+    /// Apply the chat template to a single user message.
+    ///
+    /// The returned string must be freed with `mnn_string_free`.
+    pub fn mnn_llm_apply_chat_template(llm: *mut MNNLlm, text: *const c_char) -> *mut c_char;
+
+    /// Apply the chat template to a chat message list.
+    ///
+    /// The returned string must be freed with `mnn_string_free`.
+    pub fn mnn_llm_apply_chat_template_messages(
+        llm: *mut MNNLlm,
+        roles: *const *const c_char,
+        contents: *const *const c_char,
+        n: c_int,
+    ) -> *mut c_char;
+
+    // ========================================================================
+    // LLM Config and State
+    // ========================================================================
+
+    /// Set runtime configuration from a JSON string; returns true on success.
+    pub fn mnn_llm_set_config(llm: *mut MNNLlm, json: *const c_char) -> bool;
+
+    /// Dump the current runtime configuration as a JSON string.
+    ///
+    /// The returned string must be freed with `mnn_string_free`.
+    pub fn mnn_llm_dump_config(llm: *mut MNNLlm) -> *mut c_char;
+
+    /// Reset generation state (history, counters).
+    pub fn mnn_llm_reset(llm: *mut MNNLlm);
+
+    /// Check whether KV cache reuse is enabled.
+    pub fn mnn_llm_reuse_kv(llm: *mut MNNLlm) -> bool;
+
+    /// Get the current LLM status as an `MNN_LLM_STATUS_*` value, or -2 if
+    /// the handle is NULL.
+    pub fn mnn_llm_get_status(llm: *mut MNNLlm) -> c_int;
+
+    /// Snapshot LLM context metrics into `out`; returns 0 on success and
+    /// non-zero on failure.
+    pub fn mnn_llm_get_context(llm: *mut MNNLlm, out: *mut MNNLlmContext) -> c_int;
+
+    // ========================================================================
+    // LLM Memory Helpers
+    // ========================================================================
+
+    /// Free a string previously returned by the LLM API (may be NULL).
+    pub fn mnn_string_free(s: *mut c_char);
+
+    /// Free an int array previously returned by the LLM API (may be NULL).
+    pub fn mnn_int_array_free(p: *mut c_int);
+
+    // ========================================================================
+    // Embedding Model
+    // ========================================================================
+
+    /// Create an embedding model from a model config.json path.
+    pub fn mnn_embedding_create(config_path: *const c_char, load: bool) -> *mut MNNEmbedding;
+
+    /// Destroy an embedding model (may be NULL).
+    pub fn mnn_embedding_destroy(embedding: *mut MNNEmbedding);
+
+    /// Get the embedding vector dimension; returns a negative value on failure.
+    pub fn mnn_embedding_dim(embedding: *mut MNNEmbedding) -> c_int;
+
+    /// Embed a text string into a float vector.
+    ///
+    /// Returns the number of elements written (>= 0) or a negative value on
+    /// error. If the embedding is larger than `out_cap` it is truncated.
+    pub fn mnn_embedding_txt(
+        embedding: *mut MNNEmbedding,
+        text: *const c_char,
+        out: *mut f32,
+        out_cap: c_int,
+    ) -> c_int;
+
+    /// Embed token ids into a float vector.
+    ///
+    /// Returns the number of elements written (>= 0) or a negative value on
+    /// error. If the embedding is larger than `out_cap` it is truncated.
+    pub fn mnn_embedding_ids(
+        embedding: *mut MNNEmbedding,
+        ids: *const c_int,
+        n: c_int,
+        out: *mut f32,
+        out_cap: c_int,
+    ) -> c_int;
+}
+
 #[cfg(test)]
 mod tests {}

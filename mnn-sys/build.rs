@@ -236,6 +236,7 @@ fn main() {
 
     // Read environment variables
     let mnn_source_path = env::var("MNN_SOURCE_PATH").ok();
+    let mnn_version = env::var("MNN_SOURCE_VERSION").ok();
     let mnn_lib_dir = env::var("MNN_LIB_DIR").ok();
     let mnn_include_dir = env::var("MNN_INCLUDE_DIR").ok();
     let _mnn_use_system = env::var("MNN_USE_SYSTEM").is_ok() || cfg!(feature = "system-mnn");
@@ -284,6 +285,7 @@ fn main() {
             get_lib_and_include_dirs(
                 build_from_source,
                 &mnn_source_path,
+                &mnn_version,
                 &mnn_lib_dir,
                 &mnn_include_dir,
                 use_static,
@@ -298,6 +300,7 @@ fn main() {
         get_lib_and_include_dirs(
             true,
             &mnn_source_path,
+            &mnn_version,
             &mnn_lib_dir,
             &mnn_include_dir,
             use_static,
@@ -391,6 +394,33 @@ fn main() {
     let module_wrapper_cpp = wrapper_dir.join("mnn_module_wrapper.cpp");
     if cfg!(feature = "module") && cfg!(feature = "build-from-source") && module_wrapper_cpp.exists() {
         build.file(&module_wrapper_cpp);
+    }
+
+    // Compile LLM wrapper if feature enabled
+    // Note: LLM requires MNN built with MNN_BUILD_LLM=ON. Both build-from-source
+    // and the prebuilt binaries (released by the CI workflow) ship the LLM engine
+    // and its headers (installed to <include>/llm/llm.hpp). For build-from-source
+    // also add the source-tree LLM include dir as a fallback in case the install
+    // step is incomplete.
+    let llm_wrapper_cpp = wrapper_dir.join("mnn_llm_wrapper.cpp");
+    if cfg!(feature = "llm") && llm_wrapper_cpp.exists() {
+        build.file(&llm_wrapper_cpp);
+        if cfg!(feature = "build-from-source") {
+            let src_llm_include = mnn_source_path
+                .as_ref()
+                .map(PathBuf::from)
+                .unwrap_or_else(|| get_target_directory().join("mnn-source"))
+                .join("transformers")
+                .join("llm")
+                .join("engine")
+                .join("include");
+            if src_llm_include.exists() {
+                build.include(&src_llm_include);
+            }
+        }
+        println!("cargo:rustc-cfg=feature=\"llm\"");
+    } else if cfg!(feature = "llm") {
+        panic!("mnn-sys: 'llm' feature enabled but mnn_llm_wrapper.cpp is missing (corrupted checkout)");
     }
 
     // Configure Android NDK compiler for cross-compilation
@@ -539,6 +569,7 @@ fn main() {
 
     // Tell Cargo to re-run if relevant env vars change
     println!("cargo:rerun-if-env-changed=MNN_SOURCE_PATH");
+    println!("cargo:rerun-if-env-changed=MNN_SOURCE_VERSION");
     println!("cargo:rerun-if-env-changed=MNN_LIB_DIR");
     println!("cargo:rerun-if-env-changed=MNN_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=MNN_USE_SYSTEM");
@@ -551,6 +582,8 @@ fn main() {
     // Re-run if wrapper changes
     println!("cargo:rerun-if-changed=wrapper/mnn_wrapper.h");
     println!("cargo:rerun-if-changed=wrapper/mnn_wrapper.cpp");
+    println!("cargo:rerun-if-changed=wrapper/mnn_llm_wrapper.h");
+    println!("cargo:rerun-if-changed=wrapper/mnn_llm_wrapper.cpp");
 
     if debug_build {
         println!("cargo:warning=mnn-sys: Build script completed successfully");
@@ -637,15 +670,26 @@ fn get_target_directory() -> PathBuf {
 }
 
 /// Clone MNN from GitHub
-fn clone_mnn_from_github(dest: &std::path::Path, debug: bool) {
+fn clone_mnn_from_github(dest: &std::path::Path, version: Option<&str>, debug: bool) {
     if debug {
         println!("cargo:warning=mnn-sys: Cloning MNN from GitHub to {:?}", dest);
     }
 
     let repo_url = "https://github.com/alibaba/MNN.git";
 
-    let status = Command::new("git")
-        .args(["clone", "--depth", "1", repo_url, dest.to_str().unwrap()])
+    // Pin MNN to a fixed tag/branch/commit when MNN_SOURCE_VERSION is set so
+    // builds are reproducible. Otherwise the latest main branch is used.
+    let mut cmd = Command::new("git");
+    match version {
+        Some(ver) if !ver.is_empty() => {
+            cmd.args(["clone", "--depth", "1", "--branch", ver, repo_url, dest.to_str().unwrap()]);
+        }
+        _ => {
+            cmd.args(["clone", "--depth", "1", repo_url, dest.to_str().unwrap()]);
+        }
+    }
+
+    let status = cmd
         .status()
         .expect("Failed to run git clone. Please install git or set MNN_SOURCE_PATH to an existing MNN source directory.");
 
@@ -662,6 +706,7 @@ fn clone_mnn_from_github(dest: &std::path::Path, debug: bool) {
 fn get_lib_and_include_dirs(
     build_from_source: bool,
     mnn_source_path: &Option<String>,
+    mnn_version: &Option<String>,
     mnn_lib_dir: &Option<String>,
     mnn_include_dir: &Option<String>,
     use_static: bool,
@@ -683,7 +728,7 @@ fn get_lib_and_include_dirs(
                 // This is shared across all build targets
                 let shared_source = target_dir.join("mnn-source");
                 if !shared_source.exists() {
-                    clone_mnn_from_github(&shared_source, debug);
+                    clone_mnn_from_github(&shared_source, mnn_version.as_deref(), debug);
                 } else if debug {
                     println!("cargo:warning=mnn-sys: Using cached MNN source at {:?}", shared_source);
                 }
@@ -925,6 +970,65 @@ fn build_mnn_from_source(
     }
     if cfg!(feature = "quantization") {
         cmake_args.push("-DMNN_BUILD_QUANT=ON".to_string());
+    }
+
+    // LLM engine options - applied only when building MNN from source.
+    // Prebuilt binaries already ship the LLM engine (MNN_BUILD_LLM=ON is set
+    // by the CI workflow that produces them).
+    if cfg!(feature = "llm") {
+        cmake_args.push("-DMNN_BUILD_LLM=ON".to_string());
+        // MNN_LLM_BUILD_DEMO defaults to ON and would compile 6 demo executables;
+        // only the MNN library itself is needed.
+        cmake_args.push("-DMNN_LLM_BUILD_DEMO=OFF".to_string());
+        // LLM_SUPPORT_HTTP_RESOURCE defaults to ON and pulls in httplib.
+        cmake_args.push("-DLLM_SUPPORT_HTTP_RESOURCE=OFF".to_string());
+    }
+
+    // The CUDA backend fetches CUTLASS from GitHub via FetchContent. MNN's
+    // cuda CMakeLists expects the source at 3rd_party/cutlass/<version> (e.g.
+    // v4.0.0 when MNN_SUPPORT_TRANSFORMER_FUSE is ON, which MNN_BUILD_LLM
+    // forces). If that pre-placed directory exists, tell FetchContent to trust
+    // it and skip all network git operations (offline build support).
+    if cfg!(feature = "cuda") {
+        let cutlass_version = if cfg!(feature = "llm") { "v4.0.0" } else { "v2.9.0" };
+        let cutlass_dir = source_path
+            .join("3rd_party")
+            .join("cutlass")
+            .join(cutlass_version);
+        if cutlass_dir.join("CMakeLists.txt").exists() {
+            cmake_args.push("-DFETCHCONTENT_FULLY_DISCONNECTED=ON".to_string());
+            if debug {
+                println!(
+                    "cargo:warning=mnn-sys: Found pre-placed CUTLASS at {}, using offline mode",
+                    cutlass_dir.display()
+                );
+            }
+        } else {
+            println!(
+                "cargo:warning=mnn-sys: CUDA build needs CUTLASS, expected at {} but not found (FetchContent will try to download it)",
+                cutlass_dir.display()
+            );
+        }
+
+        // nvcc needs an absolute --compiler-bindir on Windows. When the build
+        // runs without a VS developer prompt, FindCUDA falls back to MSBuild
+        // variables ($(VCInstallDir)...) which never expand, so nvcc cannot
+        // find cl.exe. Resolve cl.exe via the cc crate and pin CUDA_HOST_COMPILER
+        // to the directory that contains it (nvcc's -ccbin expects a directory).
+        let cxx_compiler = cc::Build::new().cpp(true).try_get_compiler().ok();
+        if let Some(compiler) = cxx_compiler {
+            let cl_path = compiler.path();
+            if cl_path.exists() {
+                let bindir = cl_path.parent().unwrap_or(cl_path);
+                cmake_args.push(format!("-DCUDA_HOST_COMPILER={}", bindir.display()));
+                if debug {
+                    println!(
+                        "cargo:warning=mnn-sys: CUDA_HOST_COMPILER set to {}",
+                        bindir.display()
+                    );
+                }
+            }
+        }
     }
 
     // x86 SIMD options (controlled by features)
@@ -1265,6 +1369,25 @@ fn configure_platform(target_os: &str, target_env: &str) {
         }
         if cfg!(feature = "opencl") {
             println!("cargo:rustc-link-lib=OpenCL");
+            // OpenCL.lib is not on the default link path on Windows; add known
+            // locations (NVIDIA CUDA toolkit, then Windows SDK um\x64).
+            if let Ok(cuda_path) = env::var("CUDA_PATH") {
+                let cuda_lib = PathBuf::from(cuda_path).join("lib").join("x64");
+                if cuda_lib.join("OpenCL.lib").exists() {
+                    println!("cargo:rustc-link-search=native={}", cuda_lib.display());
+                }
+            }
+            if let Ok(kit_root) = env::var("WindowsSdkDir") {
+                if let Ok(entries) = std::fs::read_dir(&kit_root) {
+                    for entry in entries.flatten() {
+                        let sdk_lib = entry.path().join("um").join("x64");
+                        if sdk_lib.join("OpenCL.lib").exists() {
+                            println!("cargo:rustc-link-search=native={}", sdk_lib.display());
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
         if target_env == "gnu" {

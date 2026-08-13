@@ -81,6 +81,9 @@ image-process = ["mnn-rs-sys/image-process"]
 module = ["mnn-rs-sys/module"]
 # Multi-session runtime sharing (requires MNN with RuntimeManager)
 runtime = ["mnn-rs-sys/runtime"]
+# LLM large language model inference (prebuilt binaries ship the LLM engine;
+# build-from-source also works and adds MNN_BUILD_LLM=ON)
+llm = ["mnn-rs-sys/llm"]
 
 # Platform specific (usually auto-detected)
 android = ["mnn-rs-sys/android"]
@@ -126,3 +129,15 @@ required-features = ["image-process"]
 [[example]]
 name = "mnn_cv"
 required-features = ["image-process"]
+
+[[example]]
+name = "llm_chat"
+required-features = ["llm"]
+
+[[example]]
+name = "llm_stream"
+required-features = ["llm"]
+
+[[example]]
+name = "llm_embedding"
+required-features = ["llm"]

@@ -14,6 +14,7 @@ Rust bindings for [MNN](https://github.com/alibaba/MNN) (Mobile Neural Network),
 - **Multiple Backends**: CPU, CUDA, OpenCL, Vulkan, and Metal
 - **Static/Dynamic Linking**: Choose between static or dynamic linking
 - **Async Support**: Optional async API with Tokio integration
+- **LLM Support**: Run large language models (Qwen, Llama, ChatGLM, etc.) locally
 - **Build from Source**: Option to build MNN locally when needed
 
 ## Quick Start
@@ -49,6 +50,16 @@ If you need to build MNN locally (e.g., for custom build options):
 ```bash
 cargo build --features build-from-source --no-default-features
 ```
+
+By default the latest `main` branch of MNN is cloned. To pin a specific MNN
+tag, branch, or commit (recommended for reproducible builds), set
+`MNN_SOURCE_VERSION`:
+
+```bash
+MNN_SOURCE_VERSION=v3.6.1 cargo build --features build-from-source --no-default-features
+```
+
+The prebuilt binaries are built from MNN `v3.6.1`.
 
 This requires:
 - Git (for cloning MNN source)
@@ -138,6 +149,35 @@ async fn main() -> Result<(), MnnError> {
 }
 ```
 
+### LLM Inference (requires `llm` feature)
+
+```rust
+use mnn_rs::{ChatMessage, Llm};
+
+fn main() -> Result<(), mnn_rs::MnnError> {
+    // config.json is produced by `transformers/llm/export/llmexport.py`
+    let mut llm = Llm::create("model_dir/config.json")?;
+    llm.load()?;
+
+    // Streaming generation (closure receives each decoded chunk)
+    llm.generate_stream("Hello!", 1, |chunk| print!("{chunk}"))?;
+    println!();
+
+    // Single-turn response
+    let reply = llm.response("Hello!", Some(128))?;
+
+    // Multi-turn chat with KV-cache reuse
+    llm.set_config(r#"{"reuse_kv": true}"#)?;
+    let history = vec![
+        ChatMessage { role: "system".into(), content: "Be concise.".into() },
+        ChatMessage { role: "user".into(), content: "What is Rust?".into() },
+    ];
+    let reply = llm.response_messages(&history, Some(128))?;
+
+    Ok(())
+}
+```
+
 ## Features
 
 ### Linking Mode
@@ -188,6 +228,30 @@ async fn main() -> Result<(), MnnError> {
 |---------|-------------|
 | `async` | Enable async API with Tokio |
 
+### LLM Support
+
+| Feature | Description |
+|---------|-------------|
+| `llm` | Enable MNN LLM engine bindings (`Llm`, `Embedding`) |
+
+The prebuilt MNN binaries ship the LLM engine, so `llm` works with the default
+prebuilt download:
+
+```bash
+cargo build --features llm
+```
+
+When building MNN from source, the `llm` feature automatically adds
+`MNN_BUILD_LLM=ON` (which turns on `MNN_LOW_MEMORY` and
+`MNN_SUPPORT_TRANSFORMER_FUSE`) and disables the MNN demo executables:
+
+```bash
+cargo build --features llm,build-from-source --no-default-features
+```
+
+The LLM C++ engine (`MNN::Transformer::Llm` / `Embedding`) is merged into
+`libMNN.a`/`mnn.lib` for static builds.
+
 ## Examples
 
 See the `examples/` directory for more usage examples:
@@ -195,6 +259,9 @@ See the `examples/` directory for more usage examples:
 - `basic_inference.rs` - Basic inference workflow
 - `async_inference.rs` - Async inference with Tokio
 - `gpu_backend.rs` - Using GPU backends
+- `llm_chat.rs` - Interactive multi-turn LLM chat
+- `llm_stream.rs` - Streaming LLM text generation
+- `llm_embedding.rs` - Text embedding and cosine similarity
 
 ```bash
 # Run basic inference example
@@ -293,6 +360,7 @@ cargo build --target x86_64-pc-windows-gnu
 |----------|-------------|
 | `MNN_PREBUILT_URL` | Custom URL for prebuilt MNN binaries |
 | `MNN_SOURCE_PATH` | Path to MNN source directory (for build-from-source) |
+| `MNN_SOURCE_VERSION` | Pin MNN source to a tag/branch/commit (e.g. `v3.6.1`) when cloning from GitHub |
 | `MNN_LIB_DIR` | Path to pre-built MNN library |
 | `MNN_INCLUDE_DIR` | Path to MNN headers |
 | `MNN_DEBUG_BUILD` | Print debug information during build |

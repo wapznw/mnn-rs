@@ -123,6 +123,12 @@ mod runtime;
 #[cfg(feature = "runtime")]
 pub use runtime::{InterpreterRuntimeExt, RuntimeInfo};
 
+// LLM inference support (requires building MNN from source with MNN_BUILD_LLM=ON)
+#[cfg(feature = "llm")]
+mod llm;
+#[cfg(feature = "llm")]
+pub use llm::{ChatMessage, Embedding, Llm, LlmPerformance, LlmStatus};
+
 // Async module
 #[cfg(feature = "async")]
 mod async_mod;
@@ -152,6 +158,8 @@ pub mod prelude {
     pub use crate::image_process::{ImageConfig, ImageFormat, Filter};
     #[cfg(feature = "runtime")]
     pub use crate::runtime::RuntimeInfo;
+    #[cfg(feature = "llm")]
+    pub use crate::llm::{ChatMessage, Embedding, Llm, LlmPerformance, LlmStatus};
 }
 
 /// Testing utilities (only available in tests).
