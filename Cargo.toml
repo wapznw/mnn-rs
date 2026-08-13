@@ -92,7 +92,7 @@ embedded = []
 # would otherwise conflict with the 'dynamic' feature via Cargo feature
 # unification. mnn-rs's own default features forward cpu/static/use-prebuilt
 # explicitly, so default builds are unchanged.
-mnn-rs-sys = { path = "mnn-sys", version = "0.1.0", package = "mnn-rs-sys", default-features = false }
+mnn-rs-sys = { path = "mnn-sys", version = "0.1", package = "mnn-rs-sys", default-features = false }
 thiserror = { workspace = true }
 tokio = { workspace = true, optional = true, features = ["rt", "sync"] }
 
