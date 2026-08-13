@@ -708,6 +708,13 @@ jobs:
         run: |
           git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
+      - name: Patch MNN LLM CMake (OBJECT library POST_BUILD workaround)
+        run: |
+          # Upstream MNN bug: with MNN_SEP_BUILD=OFF the `llm` target is an
+          # OBJECT library, but transformers/llm/engine/CMakeLists.txt attaches
+          # a POST_BUILD command to it, which modern CMake rejects.
+          python3 scripts/patch_mnn_llm_cmake.py mnn-source
+
       - name: Build MNN with OpenCL for Android
         run: |
           cmake -B build -S mnn-source -G Ninja \
@@ -771,6 +778,13 @@ jobs:
       - name: Get MNN Source
         run: |
           git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+
+      - name: Patch MNN LLM CMake (OBJECT library POST_BUILD workaround)
+        run: |
+          # Upstream MNN bug: with MNN_SEP_BUILD=OFF the `llm` target is an
+          # OBJECT library, but transformers/llm/engine/CMakeLists.txt attaches
+          # a POST_BUILD command to it, which modern CMake rejects.
+          python3 scripts/patch_mnn_llm_cmake.py mnn-source
 
       - name: Build MNN with Vulkan for Android
         run: |

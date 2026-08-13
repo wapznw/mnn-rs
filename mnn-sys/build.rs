@@ -807,7 +807,6 @@ fn compute_config_hash(
     hasher.finish()
 }
 
-/// Build MNN from source using CMake
 #[cfg(feature = "build-from-source")]
 /// Workaround for upstream MNN bug: when MNN_SEP_BUILD is OFF (the default for
 /// mnn-rs static builds), the `llm` target in transformers/llm/engine is an
@@ -892,6 +891,8 @@ ELSE()"#;
     }
 }
 
+/// Build MNN from source using CMake
+#[cfg(feature = "build-from-source")]
 fn build_mnn_from_source(
     source_path: &std::path::Path,
     build_dir: &std::path::Path,
