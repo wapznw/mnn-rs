@@ -52,6 +52,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_WIN_RUNTIME_MT=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -122,6 +123,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -187,6 +189,7 @@ jobs:
             -DMNN_WIN_RUNTIME_MT=ON \
             -DMNN_CUDA=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -247,6 +250,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_CUDA=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -311,6 +315,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_METAL=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -372,6 +377,13 @@ jobs:
         run: |
           git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
+      - name: Patch MNN LLM CMake (OBJECT library POST_BUILD workaround)
+        run: |
+          # Upstream MNN bug: with MNN_SEP_BUILD=OFF the `llm` target is an
+          # OBJECT library, but transformers/llm/engine/CMakeLists.txt attaches
+          # a POST_BUILD command to it, which modern CMake rejects.
+          python3 scripts/patch_mnn_llm_cmake.py mnn-source
+
       - name: Build MNN
         run: |
           # Set ARM-specific options
@@ -390,6 +402,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_KLEIDIAI=OFF \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -466,6 +479,7 @@ jobs:
             -DMNN_METAL=$ENABLE_METAL \
             -DMNN_ARM82=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_OPENCL=OFF \
             -DMNN_OPENGL=OFF \
             -DMNN_VULKAN=OFF \
@@ -535,6 +549,7 @@ jobs:
             -DMNN_WIN_RUNTIME_MT=ON \
             -DMNN_OPENCL=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -588,6 +603,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_OPENCL=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -640,6 +656,7 @@ jobs:
             -DMNN_BUILD_SHARED_LIBS=OFF \
             -DMNN_VULKAN=ON \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -703,6 +720,7 @@ jobs:
             -DMNN_ARM82=ON \
             -DMNN_KLEIDIAI=OFF \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \
@@ -766,6 +784,7 @@ jobs:
             -DMNN_ARM82=ON \
             -DMNN_KLEIDIAI=OFF \
             -DMNN_BUILD_LLM=ON \
+            -DLLM_SUPPORT_HTTP_RESOURCE=OFF \
             -DMNN_BUILD_TOOLS=OFF \
             -DMNN_BUILD_TEST=OFF \
             -DMNN_BUILD_BENCHMARK=OFF \

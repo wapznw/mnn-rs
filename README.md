@@ -243,7 +243,9 @@ cargo build --features llm
 
 When building MNN from source, the `llm` feature automatically adds
 `MNN_BUILD_LLM=ON` (which turns on `MNN_LOW_MEMORY` and
-`MNN_SUPPORT_TRANSFORMER_FUSE`) and disables the MNN demo executables:
+`MNN_SUPPORT_TRANSFORMER_FUSE`), disables the MNN demo executables, and turns
+off `LLM_SUPPORT_HTTP_RESOURCE` (the bundled cpp-httplib does not support
+32-bit platforms, so models must be loaded from local files):
 
 ```bash
 cargo build --features llm,build-from-source --no-default-features

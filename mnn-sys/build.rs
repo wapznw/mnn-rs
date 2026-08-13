@@ -809,6 +809,89 @@ fn compute_config_hash(
 
 /// Build MNN from source using CMake
 #[cfg(feature = "build-from-source")]
+/// Workaround for upstream MNN bug: when MNN_SEP_BUILD is OFF (the default for
+/// mnn-rs static builds), the `llm` target in transformers/llm/engine is an
+/// OBJECT library, but its CMakeLists.txt attaches a POST_BUILD command to it.
+/// Modern CMake rejects POST_BUILD on OBJECT libraries, which fails Android
+/// builds. Affects MNN 3.6.1 and current main. Patch the file in place
+/// (idempotently) to copy headers at configure time instead. Mirrors
+/// scripts/patch_mnn_llm_cmake.py.
+fn patch_llm_cmake_for_object_library(source_path: &std::path::Path, debug: bool) {
+    let cmake_file = source_path
+        .join("transformers")
+        .join("llm")
+        .join("engine")
+        .join("CMakeLists.txt");
+    if !cmake_file.exists() {
+        return; // MNN version without the LLM engine; nothing to patch
+    }
+    let original = match std::fs::read_to_string(&cmake_file) {
+        Ok(s) => s,
+        Err(e) => {
+            println!(
+                "cargo:warning=mnn-sys: could not read {}: {}",
+                cmake_file.display(),
+                e
+            );
+            return;
+        }
+    };
+    // Already patched (idempotency check)
+    if original.contains("file(COPY ${CMAKE_CURRENT_LIST_DIR}/include/ DESTINATION") {
+        return;
+    }
+    const NEEDLE: &str = r#"IF(NOT NATIVE_INCLUDE_OUTPUT)
+  set(NATIVE_INCLUDE_OUTPUT ".")
+ENDIF()
+add_custom_command(
+  TARGET llm
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND}
+  ARGS -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/include ${NATIVE_INCLUDE_OUTPUT}
+)
+ELSE()"#;
+    const REPLACEMENT: &str = r#"IF(NOT NATIVE_INCLUDE_OUTPUT)
+  set(NATIVE_INCLUDE_OUTPUT ".")
+ENDIF()
+IF(NOT MNN_SEP_BUILD)
+  # mnn-rs workaround for upstream MNN bug: `llm` is an OBJECT library when
+  # MNN_SEP_BUILD is OFF, and CMake forbids POST_BUILD on OBJECT libraries.
+  # Copy headers at configure time instead.
+  file(COPY ${CMAKE_CURRENT_LIST_DIR}/include/ DESTINATION ${NATIVE_INCLUDE_OUTPUT})
+ELSE()
+add_custom_command(
+  TARGET llm
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND}
+  ARGS -E copy_directory ${CMAKE_CURRENT_LIST_DIR}/include ${NATIVE_INCLUDE_OUTPUT}
+)
+ENDIF()
+ELSE()"#;
+    if !original.contains(NEEDLE) {
+        println!(
+            "cargo:warning=mnn-sys: skipping CMake workaround patch (pattern not found) in {}",
+            cmake_file.display()
+        );
+        return;
+    }
+    let patched = original.replace(NEEDLE, REPLACEMENT);
+    match std::fs::write(&cmake_file, patched) {
+        Ok(()) => {
+            if debug {
+                println!(
+                    "cargo:warning=mnn-sys: patched {} (llm OBJECT-library POST_BUILD workaround)",
+                    cmake_file.display()
+                );
+            }
+        }
+        Err(e) => println!(
+            "cargo:warning=mnn-sys: failed to patch {}: {}",
+            cmake_file.display(),
+            e
+        ),
+    }
+}
+
 fn build_mnn_from_source(
     source_path: &std::path::Path,
     build_dir: &std::path::Path,
@@ -827,6 +910,12 @@ fn build_mnn_from_source(
         println!("cargo:warning=mnn-sys: Source: {:?}", source_path);
         println!("cargo:warning=mnn-sys: Build dir: {:?}", build_dir);
         println!("cargo:warning=mnn-sys: Install dir: {:?}", install_dir);
+    }
+
+    // Workaround for upstream MNN bug (OBJECT library + POST_BUILD) that fails
+    // Android builds with modern CMake.
+    if target_os == "android" {
+        patch_llm_cmake_for_object_library(source_path, debug);
     }
 
     // Compute configuration hash
