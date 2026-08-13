@@ -42,7 +42,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         shell: bash
@@ -110,7 +110,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -174,7 +174,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with CUDA
         shell: bash
@@ -236,7 +236,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with CUDA
         run: |
@@ -295,7 +295,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -370,7 +370,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -440,7 +440,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -524,7 +524,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL
         shell: bash
@@ -579,7 +579,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL
         run: |
@@ -631,7 +631,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with Vulkan
         run: |
@@ -689,7 +689,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL for Android
         run: |
@@ -752,7 +752,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch v3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with Vulkan for Android
         run: |

@@ -56,10 +56,10 @@ tag, branch, or commit (recommended for reproducible builds), set
 `MNN_SOURCE_VERSION`:
 
 ```bash
-MNN_SOURCE_VERSION=v3.6.1 cargo build --features build-from-source --no-default-features
+MNN_SOURCE_VERSION=3.6.1 cargo build --features build-from-source --no-default-features
 ```
 
-The prebuilt binaries are built from MNN `v3.6.1`.
+The prebuilt binaries are built from MNN `3.6.1`.
 
 This requires:
 - Git (for cloning MNN source)
@@ -360,7 +360,7 @@ cargo build --target x86_64-pc-windows-gnu
 |----------|-------------|
 | `MNN_PREBUILT_URL` | Custom URL for prebuilt MNN binaries |
 | `MNN_SOURCE_PATH` | Path to MNN source directory (for build-from-source) |
-| `MNN_SOURCE_VERSION` | Pin MNN source to a tag/branch/commit (e.g. `v3.6.1`) when cloning from GitHub |
+| `MNN_SOURCE_VERSION` | Pin MNN source to a tag/branch/commit (e.g. `3.6.1`) when cloning from GitHub |
 | `MNN_LIB_DIR` | Path to pre-built MNN library |
 | `MNN_INCLUDE_DIR` | Path to MNN headers |
 | `MNN_DEBUG_BUILD` | Print debug information during build |
