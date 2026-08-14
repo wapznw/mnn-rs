@@ -59,7 +59,7 @@ tag, branch, or commit (recommended for reproducible builds), set
 MNN_SOURCE_VERSION=3.6.1 cargo build --features build-from-source --no-default-features
 ```
 
-The prebuilt binaries are built from MNN `main`.
+The prebuilt binaries are built from MNN `3.6.1`.
 
 This requires:
 - Git (for cloning MNN source)
