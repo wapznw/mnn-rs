@@ -870,6 +870,20 @@ jobs:
             cp -r mnn-src/transformers/llm/engine/include/llm/. "$dir/include/llm/" 2>/dev/null || true
           done
 
+      - name: Provide libmnn.a (Unix link name the crate expects)
+        # mnn-sys links `-l mnn` on Unix, which requires `libmnn.a`.
+        # MNN's prebuilt ships `libMNN.a`, so copy it to the name the
+        # linker expects for every non-Windows artifact (Windows ships
+        # `mnn.lib`, which is already correct).
+        run: |
+          for dir in artifacts/mnn-*/; do
+            lib="$dir/lib"
+            if [ -f "$lib/libMNN.a" ]; then
+              cp "$lib/libMNN.a" "$lib/libmnn.a"
+              echo "Added $lib/libmnn.a"
+            fi
+          done
+
       - name: Create release archives
         run: |
           cd artifacts
