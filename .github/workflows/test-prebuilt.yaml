@@ -1,0 +1,106 @@
+name: Test (Prebuilt MNN)
+
+# Runs real inference tests against the prebuilt MNN binaries downloaded from
+# the GitHub Release matching the current crate version (CARGO_PKG_VERSION).
+#
+# Prerequisites:
+#   - A GitHub Release `v<CARGO_PKG_VERSION>` (currently v0.1.6) on wapznw/mnn-rs
+#     must contain `mnn-<target>.tar.gz` for each matrix target. These are
+#     produced by .github/workflows/build-binaries.yml on tag push. If the
+#     release/assets are missing, `use-prebuilt` fails (this workflow does NOT
+#     fall back to building MNN from source).
+#   - GitHub runners must be able to reach huggingface.co to download the LLM
+#     test model (a ModelScope alternative is provided in a comment below).
+#
+# Tests covered:
+#   - Classification: tests/models/mobilenetV3.mnn is committed in the repo and
+#     exercised by the `#[ignore]`-gated tests in tests/integration_test.rs
+#     (run via `--include-ignored`).
+#   - LLM: the user-supplied LLM test (if any) reads $MNN_TEST_LLM_DIR.
+#   - LLM example: examples/llm_stream.rs runs real streaming generation and
+#     exits (llm_chat is interactive and is intentionally NOT run here).
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  # Directory where the LLM test model is downloaded; the user's LLM test and
+  # the llm_stream example both read tests/models/llm/config.json from here.
+  MNN_TEST_LLM_DIR: tests/models/llm
+
+jobs:
+  test:
+    name: Test ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Cache LLM test model
+        id: llm-model
+        uses: actions/cache@v4
+        with:
+          path: tests/models/llm
+          # Bump this key to force a fresh download when the model changes.
+          key: llm-model-qwen2-0.5b-instruct-mnn-v1
+
+      - name: Download LLM test model
+        if: steps.llm-model.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          python3 -m pip install -q huggingface_hub
+          python3 -c "from huggingface_hub import snapshot_download; snapshot_download('taobao-mnn/Qwen2-0.5B-Instruct-MNN', local_dir='tests/models/llm')"
+        # If huggingface.co is unreachable from the runner, use ModelScope instead:
+        #   python3 -m pip install -q modelscope
+        #   python3 -c "from modelscope import snapshot_download; snapshot_download('taobao-mnn/Qwen2-0.5B-Instruct-MNN', local_dir='tests/models/llm')"
+
+      - name: Run tests (classification + LLM)
+        # Default features (cpu, static, use-prebuilt) + llm. build.rs auto-downloads
+        # mnn-<target>.tar.gz from the v<version> release. `--include-ignored` also
+        # runs the model-dependent classification tests (mobilenetV3.mnn is committed).
+        shell: bash
+        run: |
+          cargo test --target ${{ matrix.target }} --features llm -- --include-ignored
+
+      - name: Run LLM streaming example
+        # Real streaming generation against the downloaded model; exits on its own.
+        shell: bash
+        run: |
+          cargo run --target ${{ matrix.target }} --example llm_stream --features llm -- tests/models/llm/config.json "Hello, please introduce yourself in one sentence."
