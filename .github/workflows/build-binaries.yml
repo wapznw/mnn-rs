@@ -42,7 +42,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         shell: bash
@@ -111,7 +111,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -176,7 +176,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with CUDA
         shell: bash
@@ -239,7 +239,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with CUDA
         run: |
@@ -299,7 +299,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -375,7 +375,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Patch MNN LLM CMake (OBJECT library POST_BUILD workaround)
         run: |
@@ -453,7 +453,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN
         run: |
@@ -538,7 +538,7 @@ jobs:
       - name: Get MNN Source
         shell: bash
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL
         shell: bash
@@ -594,7 +594,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with OpenCL
         run: |
@@ -647,7 +647,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Build MNN with Vulkan
         run: |
@@ -706,7 +706,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Patch MNN LLM CMake (OBJECT library POST_BUILD workaround)
         run: |
@@ -777,7 +777,7 @@ jobs:
 
       - name: Get MNN Source
         run: |
-          git clone --depth 1 --branch 3.6.1 https://github.com/alibaba/MNN.git mnn-source
+          git clone --depth 1 --branch main https://github.com/alibaba/MNN.git mnn-source
 
       - name: Patch MNN LLM CMake (OBJECT library POST_BUILD workaround)
         run: |
@@ -854,6 +854,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Inject MNN LLM headers into artifacts
+        # The prebuilt lib is built with -DMNN_BUILD_LLM=ON (so it exports the
+        # Llm symbols), but MNN's install step does NOT ship the LLM C++ headers
+        # (llm/llm.hpp) that mnn-sys's wrapper needs under the `llm` feature.
+        # Pull them from the matching MNN source tree (sparse: headers only) and
+        # add them to every artifact so the prebuilt works for `llm` out of the box.
+        run: |
+          git clone --depth 1 --branch main --filter=blob:none --sparse \
+            https://github.com/alibaba/MNN.git mnn-src
+          git -C mnn-src sparse-checkout set transformers/llm/engine/include
+          for dir in artifacts/mnn-*/; do
+            mkdir -p "$dir/include/llm"
+            cp -r mnn-src/transformers/llm/engine/include/llm/. "$dir/include/llm/" 2>/dev/null || true
+          done
 
       - name: Create release archives
         run: |
