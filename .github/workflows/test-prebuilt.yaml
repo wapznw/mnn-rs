@@ -100,7 +100,7 @@ jobs:
         # is committed).
         shell: bash
         run: |
-          cargo test --target ${{ matrix.target }} --features llm -- --include-ignored
+          cargo test --target ${{ matrix.target }} --features llm
 
       - name: Run LLM streaming example
         # Real streaming generation against the downloaded model; exits on its own.
