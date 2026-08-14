@@ -8,13 +8,11 @@ name: Test (Prebuilt MNN)
 #     must contain `mnn-<target>.tar.gz` for each matrix target. These are
 #     produced by .github/workflows/build-binaries.yml on tag push. If the
 #     release/assets are missing, MNN linking fails.
-#   - The prebuilt `include/` omits MNN's LLM C++ headers (llm/llm.hpp) that
-#     mnn-sys's wrapper needs under the `llm` feature, so this workflow fetches
-#     them from the matching MNN source tree (sparse: headers only) and points
-#     build.rs at the assembled dir via MNN_LIB_DIR/MNN_INCLUDE_DIR.
+#   - The prebuilt bundle (built by build-binaries.yml) ships both the MNN
+#     library and the LLM C++ headers (llm/llm.hpp) that mnn-sys's wrapper
+#     needs under the `llm` feature, so build.rs downloads and uses it directly.
 #   - GitHub runners must be able to reach huggingface.co to download the LLM
-#     test model (a ModelScope alternative is provided in a comment below), and
-#     github.com to clone MNN headers.
+#     test model (a ModelScope alternative is provided in a comment below).
 #
 # Tests covered:
 #   - Classification: tests/models/mobilenetV3.mnn is committed in the repo and
@@ -89,49 +87,24 @@ jobs:
         if: steps.llm-model.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          python3 -m pip install -q -U huggingface_hub
+          python3 -m pip install -q -U --break-system-packages huggingface_hub
           python3 -c "from huggingface_hub import snapshot_download; snapshot_download('taobao-mnn/Qwen2-0.5B-Instruct-MNN', local_dir='tests/models/llm')"
         # If huggingface.co is unreachable from the runner, use ModelScope instead:
         #   python3 -m pip install -q modelscope
         #   python3 -c "from modelscope import snapshot_download; snapshot_download('taobao-mnn/Qwen2-0.5B-Instruct-MNN', local_dir='tests/models/llm')"
 
-      - name: Prepare MNN (prebuilt lib + LLM headers)
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([0-9.]+)".*/\1/')"
-          TARGET="${{ matrix.target }}"
-          MNN_VER="3.6.1"   # MNN version the prebuilt binaries were built from
-
-          # 1) Prebuilt lib + base headers (same asset build.rs would download)
-          URL="https://github.com/wapznw/mnn-rs/releases/download/v${VERSION}/mnn-${TARGET}.tar.gz"
-          mkdir -p mnn-prebuilt
-          curl -fSL "$URL" | tar -xz -C mnn-prebuilt
-
-          # 2) Prebuilt include/ omits MNN's LLM C++ headers (llm/llm.hpp) needed by
-          #    mnn-sys's wrapper under the `llm` feature. Pull them from the matching
-          #    MNN source (sparse checkout: headers only).
-          git clone --depth 1 --branch "${MNN_VER}" --filter=blob:none --sparse \
-            https://github.com/alibaba/MNN.git mnn-src
-          git -C mnn-src sparse-checkout set transformers/llm/engine/include
-          cp -r mnn-src/transformers/llm/engine/include/. mnn-prebuilt/include/
-
-          # 3) Point build.rs at the assembled dir so it uses these and skips its download
-          echo "MNN_LIB_DIR=$PWD/mnn-prebuilt/lib" >> "$GITHUB_ENV"
-          echo "MNN_INCLUDE_DIR=$PWD/mnn-prebuilt/include" >> "$GITHUB_ENV"
-
       - name: Run tests (classification + LLM)
-        # Default features (cpu, static) + llm. MNN lib/headers come from
-        # MNN_LIB_DIR/MNN_INCLUDE_DIR prepared above (prebuilt lib augmented with
-        # MNN's LLM headers). `--include-ignored` also runs the model-dependent
-        # classification tests (mobilenetV3.mnn is committed).
+        # Default features (cpu, static) + llm. build.rs downloads the matching
+        # prebuilt MNN (lib + LLM headers) automatically. `--include-ignored`
+        # also runs the model-dependent classification tests (mobilenetV3.mnn
+        # is committed).
         shell: bash
         run: |
           cargo test --target ${{ matrix.target }} --features llm -- --include-ignored
 
       - name: Run LLM streaming example
         # Real streaming generation against the downloaded model; exits on its own.
-        # Uses the same prepared MNN lib/headers via MNN_LIB_DIR/MNN_INCLUDE_DIR.
+        # Uses the prebuilt MNN downloaded by build.rs under the `llm` feature.
         shell: bash
         run: |
           cargo run --target ${{ matrix.target }} --example llm_stream --features llm -- tests/models/llm/config.json "Hello, please introduce yourself in one sentence."
