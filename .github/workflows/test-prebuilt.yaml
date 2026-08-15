@@ -93,6 +93,32 @@ jobs:
         #   python3 -m pip install -q modelscope
         #   python3 -c "from modelscope import snapshot_download; snapshot_download('taobao-mnn/Qwen2-0.5B-Instruct-MNN', local_dir='tests/models/llm')"
 
+      - name: Patch LLM model config (add jinja chat template)
+        # The upstream taobao-mnn model's llm_config.json carries no `jinja`
+        # field (only the legacy `prompt_template`, which MNN 3.6.1 does not
+        # read on the Llm::response path). Without it, apply_chat_template
+        # falls back to concatenating the raw prompt with no <|im_start|>
+        # markers, the model never emits its <|im_end|> EOS token, and
+        # streaming generation loops forever. Inject the standard Qwen2
+        # ChatML jinja template (the same one the locally-converted model
+        # ships). Runs unconditionally (idempotent) so cached models are
+        # patched too.
+        shell: bash
+        run: |
+          python3 - <<'PYEOF'
+          import json
+          p = 'tests/models/llm/llm_config.json'
+          with open(p, encoding='utf-8') as f:
+              d = json.load(f)
+          d['jinja'] = {
+              'chat_template': "{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system\\nYou are a helpful assistant.<|im_end|>\\n' }}{% endif %}{{'<|im_start|>' + message['role'] + '\\n' + message['content'] + '<|im_end|>' + '\\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\\n' }}{% endif %}",
+              'eos': '<|im_end|>'
+          }
+          with open(p, 'w', encoding='utf-8') as f:
+              json.dump(d, f, indent=2)
+          print('patched llm_config.json with jinja chat template')
+          PYEOF
+
       - name: Run tests (classification + LLM)
         # Default features (cpu, static) + llm. build.rs downloads the matching
         # prebuilt MNN (lib + LLM headers) automatically. `--include-ignored`
