@@ -19,13 +19,17 @@ This crate provides low-level unsafe bindings to MNN's C API. For a safe, idioma
 
 ### Default Build (Recommended)
 
-By default, the crate will automatically clone and build MNN from GitHub:
+By default, the crate downloads prebuilt MNN binaries from GitHub Releases:
 
 ```bash
 cargo build
 ```
 
-This requires Git, CMake, and a C++ compiler.
+To build MNN from source instead (requires Git, CMake, and a C++ compiler):
+
+```bash
+cargo build --no-default-features --features build-from-source
+```
 
 ### Using Pre-built MNN
 
@@ -46,7 +50,9 @@ cargo build --no-default-features --features cpu,static
 |---------|-------------|
 | `static` (default) | Static link MNN |
 | `dynamic` | Dynamic link MNN. Requires `--no-default-features` (conflicts with the default `static`) |
+| `use-prebuilt` (default) | Download prebuilt MNN binaries from GitHub Releases |
 | `build-from-source` | Clone and build MNN from GitHub |
+| `llm` | Enable MNN LLM engine bindings |
 | `cuda` | Enable CUDA backend |
 | `opencl` | Enable OpenCL backend |
 | `vulkan` | Enable Vulkan backend |

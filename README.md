@@ -51,9 +51,9 @@ If you need to build MNN locally (e.g., for custom build options):
 cargo build --features build-from-source --no-default-features
 ```
 
-By default the latest `main` branch of MNN is cloned. To pin a specific MNN
-tag, branch, or commit (recommended for reproducible builds), set
-`MNN_SOURCE_VERSION`:
+By default the default branch of the upstream MNN repository is cloned. To pin
+a specific MNN tag, branch, or commit (recommended for reproducible builds),
+set `MNN_SOURCE_VERSION`:
 
 ```bash
 MNN_SOURCE_VERSION=3.6.1 cargo build --features build-from-source --no-default-features
@@ -220,7 +220,6 @@ fn main() -> Result<(), mnn_rs::MnnError> {
 | `use-prebuilt` | ✓ | Download prebuilt MNN binaries from GitHub Releases |
 | `build-from-source` | | Build MNN from source (requires CMake, C++ compiler) |
 | `system-mnn` | | Use system-installed MNN library |
-| `generate-bindings` | | Generate FFI bindings using bindgen |
 
 ### Async Support
 
@@ -254,6 +253,14 @@ cargo build --features llm,build-from-source --no-default-features
 The LLM C++ engine (`MNN::Transformer::Llm` / `Embedding`) is merged into
 `libMNN.a`/`mnn.lib` for static builds.
 
+### Extended API Features
+
+| Feature | Description |
+|---------|-------------|
+| `image-process` | Image processing support (requires MNN with the CV module) |
+| `module` | Dynamic computation graph support (MNN Expr/Module) |
+| `runtime` | Multi-session runtime sharing (MNN RuntimeManager) |
+
 ## Examples
 
 See the `examples/` directory for more usage examples:
@@ -261,9 +268,14 @@ See the `examples/` directory for more usage examples:
 - `basic_inference.rs` - Basic inference workflow
 - `async_inference.rs` - Async inference with Tokio
 - `gpu_backend.rs` - Using GPU backends
+- `image_process.rs` - Image processing with MNN's CV module
+- `mnn_cv.rs` - OpenCV-style image operations
 - `llm_chat.rs` - Interactive multi-turn LLM chat
 - `llm_stream.rs` - Streaming LLM text generation
 - `llm_embedding.rs` - Text embedding and cosine similarity
+
+Note: `async_inference` requires the `async` feature, `gpu_backend` requires
+the `cuda` feature, and the `llm_*` examples require the `llm` feature.
 
 ```bash
 # Run basic inference example
@@ -298,6 +310,9 @@ cargo build --target aarch64-linux-android --features build-from-source --no-def
 - `x86_64-linux-android`
 - `i686-linux-android`
 
+Prebuilt binaries are shipped for `aarch64` (arm64-v8a) and `armv7`
+(armeabi-v7a) only; the `x86_64`/`i686` targets must use `build-from-source`.
+
 **Building from source requirements:**
 - Android NDK (set `ANDROID_NDK_HOME` or `NDK_HOME` environment variable)
 - Ninja build system (`choco install ninja` on Windows, `brew install ninja` on macOS)
@@ -315,14 +330,18 @@ cargo build --target aarch64-apple-ios
 # Build for iOS simulator (Apple Silicon Macs)
 cargo build --target aarch64-apple-ios-sim
 
-# Build for iOS simulator (Intel Macs)
-cargo build --target x86_64-apple-ios
+# Build for iOS simulator (Intel Macs; no prebuilt - requires build-from-source)
+cargo build --target x86_64-apple-ios --features build-from-source --no-default-features
 ```
 
 **Supported iOS targets:**
 - `aarch64-apple-ios` (iOS device)
 - `aarch64-apple-ios-sim` (iOS simulator on Apple Silicon)
 - `x86_64-apple-ios` (iOS simulator on Intel Macs)
+
+Prebuilt binaries are shipped for `aarch64-apple-ios` and
+`aarch64-apple-ios-sim`; `x86_64-apple-ios` (Intel Mac simulators) must use
+`build-from-source`.
 
 ### Linux
 
@@ -351,9 +370,9 @@ cargo build --target aarch64-apple-darwin
 # MSVC (recommended)
 cargo build --target x86_64-pc-windows-msvc
 
-# MinGW
+# MinGW (no prebuilt for GNU targets - requires build-from-source)
 rustup target add x86_64-pc-windows-gnu
-cargo build --target x86_64-pc-windows-gnu
+cargo build --target x86_64-pc-windows-gnu --features build-from-source --no-default-features
 ```
 
 ## Environment Variables
@@ -369,6 +388,7 @@ cargo build --target x86_64-pc-windows-gnu
 | `MNN_MSVC_RUNTIME` | Override MSVC C runtime for the C++ wrapper: `MT` (static CRT) or `MD` (dynamic CRT). Defaults to `/MT` for static linking and `/MD` for dynamic linking |
 | `CUDA_PATH` | CUDA installation path |
 | `ANDROID_NDK_HOME` | Android NDK installation path |
+| `NDK_HOME` | Android NDK installation path (alternative to `ANDROID_NDK_HOME`) |
 
 ## API Documentation
 
@@ -376,7 +396,8 @@ See [https://docs.rs/mnn-rs](https://docs.rs/mnn-rs) for full API documentation.
 
 ## MNN Version
 
-This crate is compatible with MNN 2.9.5+.
+The prebuilt binaries are built from MNN `3.6.1`. When building from source,
+pin the MNN version with `MNN_SOURCE_VERSION` for reproducible builds.
 
 ## License
 
